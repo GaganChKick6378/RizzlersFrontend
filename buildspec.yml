@@ -188,38 +188,80 @@ phases:
   build:
     commands:
       - terraform plan
-      - terraform apply -auto-approve || echo "Terraform failed but continuing build"
-      - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "rizzlers-frontend-dev")
-      - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "dummy-id")
-      - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name 2>/dev/null || echo "dummy-domain")
-      - export S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint 2>/dev/null || echo "dummy-endpoint")
-      - echo $S3_BUCKET_NAME > bucket-name.txt
-      - echo $CLOUDFRONT_DISTRIBUTION_ID > cloudfront-id.txt
-      - echo $CLOUDFRONT_DOMAIN_NAME > cloudfront-domain.txt
-      - echo $S3_WEBSITE_ENDPOINT > s3-website-endpoint.txt
+      - terraform apply -auto-approve
+      - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+      - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
+      - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)
+      - echo "CloudFront Distribution created with domain: $CLOUDFRONT_DOMAIN_NAME"
+      
+      # Create a proper frontend page
       - cd ../../../
       - mkdir -p frontend/dist
-      - echo "<html><head><title>Rizzlers Frontend</title></head><body><h1>Hello World from Rizzlers!</h1></body></html>" > frontend/dist/index.html
-      - cp terraform/environments/$ENVIRONMENT/bucket-name.txt frontend/dist/ || echo "rizzlers-frontend-dev" > frontend/dist/bucket-name.txt
-      - cp terraform/environments/$ENVIRONMENT/cloudfront-id.txt frontend/dist/ || echo "dummy-id" > frontend/dist/cloudfront-id.txt
-      - cp terraform/environments/$ENVIRONMENT/cloudfront-domain.txt frontend/dist/ || echo "dummy-domain" > frontend/dist/cloudfront-domain.txt
-      - cp terraform/environments/$ENVIRONMENT/s3-website-endpoint.txt frontend/dist/ || echo "dummy-endpoint" > frontend/dist/s3-website-endpoint.txt
+      - |
+        cat > frontend/dist/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Rizzlers Frontend</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                }
+                h1 {
+                    color: #0066cc;
+                    border-bottom: 2px solid #0066cc;
+                    padding-bottom: 10px;
+                }
+                .success {
+                    background-color: #d4edda;
+                    color: #155724;
+                    padding: 15px;
+                    margin: 20px 0;
+                    border-radius: 4px;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>Rizzlers Frontend</h1>
+            <div class="success">
+                <p><strong>Success!</strong> Your CloudFront distribution is working correctly.</p>
+                <p>This page is being served through CloudFront from an S3 bucket.</p>
+            </div>
+            <p>This is a sample page created by your CI/CD pipeline using:</p>
+            <ul>
+                <li>AWS CodeBuild</li>
+                <li>Terraform for infrastructure</li>
+                <li>S3 for static hosting</li>
+                <li>CloudFront for content delivery</li>
+            </ul>
+            <p>Replace this content with your actual frontend application.</p>
+        </body>
+        </html>
+        EOF
+      
+      # Deploy to S3 and invalidate CloudFront cache
       - aws s3 sync frontend/dist/ s3://$S3_BUCKET_NAME/ --delete
-      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*" || echo "CloudFront invalidation failed but continuing"
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
 
   post_build:
     commands:
-      - echo Build complete
-      - echo S3 Website URL http://$S3_WEBSITE_ENDPOINT
-      - echo CloudFront URL https://$CLOUDFRONT_DOMAIN_NAME
+      - echo "Build complete"
+      - echo "=============================================================="
+      - echo "Your website is now available at: https://$CLOUDFRONT_DOMAIN_NAME"
+      - echo "=============================================================="
+      - echo "S3 Website URL (origin): http://$(terraform output -raw s3_website_endpoint)"
+      - echo "CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
 
 artifacts:
   files:
-    - frontend/dist/index.html
-    - frontend/dist/bucket-name.txt
-    - frontend/dist/cloudfront-id.txt
-    - frontend/dist/cloudfront-domain.txt
-    - frontend/dist/s3-website-endpoint.txt
+    - frontend/dist/**/*
   base-directory: .
   discard-paths: no
 
