@@ -6,8 +6,8 @@ phases:
       nodejs: 18
     commands:
       # Install Terraform
-      - curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-      - sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+      - curl -fsSL https://apt.releases.hashicorp.com/gpg | gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+      - echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
       - sudo apt-get update && sudo apt-get install terraform
       # Install Yarn
       - npm install -g yarn
@@ -16,12 +16,9 @@ phases:
     commands:
       # Frontend Build
       - echo "Building Frontend Application"
-      - cd frontend
       - yarn install
       - yarn build
-      - cd ..
-      # Save build output
-      - mv frontend/build ./frontend-build
+      - echo "Frontend build completed"
 
   build:
     commands:
@@ -36,11 +33,12 @@ phases:
 
   post_build:
     commands:
-      # Deploy Frontend to S3
+      # Deploy Frontend to S3 (which was just created by Terraform)
       - echo "Deploying Frontend to S3"
       - |
         BUCKET_NAME="rizzlers-frontend-${ENVIRONMENT}"
-        aws s3 sync frontend-build/ s3://$BUCKET_NAME/ --delete
+        echo "Deploying to bucket: $BUCKET_NAME"
+        aws s3 sync build/ s3://$BUCKET_NAME/ --delete
       # Invalidate CloudFront
       - |
         DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Tags[?Key=='Environment'].Value, '${ENVIRONMENT}') && contains(Tags[?Key=='Name'].Value, 'rizzlers-frontend')].Id" --output text)
@@ -52,6 +50,6 @@ phases:
 
 artifacts:
   files:
-    - frontend-build/**/*
+    - build/**/*
     - terraform/frontend/**/*
   name: deployment-output
