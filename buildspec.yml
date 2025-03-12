@@ -1,0 +1,51 @@
+version: 0.2
+
+env:
+  variables:
+    TERRAFORM_VERSION: "1.5.0"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 18
+      python: 3.11
+    commands:
+      - npm install -g yarn
+      - wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+      - unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+      - mv terraform /usr/local/bin/
+      - terraform --version
+
+  pre_build:
+    commands:
+      # Terraform Init and Plan
+      - cd terraform/frontend
+      - terraform init
+      - terraform workspace select ${ENVIRONMENT} || terraform workspace new ${ENVIRONMENT}
+      - terraform plan -var="environment=${ENVIRONMENT}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan
+      # Frontend Dependencies
+      - cd ../../
+      - echo Installing dependencies...
+      - yarn install
+
+  build:
+    commands:
+      # Apply Terraform Changes
+      - cd terraform/frontend
+      - terraform apply -auto-approve tfplan
+      # Build Frontend
+      - cd ../../
+      - echo Building React application...
+      - yarn build
+
+  post_build:
+    commands:
+      - echo Uploading to S3...
+      - aws s3 sync build/ s3://$S3_BUCKET/ --delete
+      - echo Creating CloudFront invalidation...
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+
+artifacts:
+  files:
+    - '**/*'
+  base-directory: build 
