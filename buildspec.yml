@@ -2,18 +2,18 @@ version: 0.2
 
 env:
   variables:
-    TERRAFORM_VERSION: "1.5.7"
-    NODE_VERSION: "18"
+    TERRAFORM_VERSION: 1.5.7
+    NODE_VERSION: 18
   parameter-store:
-    AWS_ACCESS_KEY_ID: "/rizzlers/access_id"
-    AWS_SECRET_ACCESS_KEY: "/rizzlers/secret_key"
+    AWS_ACCESS_KEY_ID: /rizzlers/access_id
+    AWS_SECRET_ACCESS_KEY: /rizzlers/secret_key
 
 phases:
   install:
     runtime-versions:
       nodejs: $NODE_VERSION
     commands:
-      - echo "Installing Terraform..."
+      - echo Installing Terraform
       - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - unzip -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - mv terraform /usr/local/bin/
@@ -23,43 +23,41 @@ phases:
 
   pre_build:
     commands:
-      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then ENVIRONMENT=dev; elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then ENVIRONMENT=qa; else echo "Branch not configured for deployment"; exit 1; fi
-      - echo "Deploying to $ENVIRONMENT environment"
+      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then ENVIRONMENT=dev; elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then ENVIRONMENT=qa; else echo Branch not configured for deployment; exit 1; fi
+      - echo Deploying to $ENVIRONMENT environment
       - export ENVIRONMENT=$ENVIRONMENT
       - cd terraform/environments/$ENVIRONMENT
-      - echo "Initializing Terraform..."
+      - echo Initializing Terraform
       - terraform init
 
   build:
     commands:
-      - echo "Applying Terraform..."
+      - echo Applying Terraform
       - terraform apply -auto-approve
       - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
-      - echo "S3 Bucket: $S3_BUCKET_NAME"
-      - echo "CloudFront Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
-      - echo "Writing bucket info to file for deployment stage..."
-      - echo "$S3_BUCKET_NAME" > bucket-name.txt
-      - echo "$CLOUDFRONT_DISTRIBUTION_ID" > cloudfront-id.txt
-      - echo "Building frontend..."
+      - echo S3 Bucket $S3_BUCKET_NAME
+      - echo CloudFront Distribution $CLOUDFRONT_DISTRIBUTION_ID
+      - echo Writing bucket info to file for deployment stage
+      - echo $S3_BUCKET_NAME > bucket-name.txt
+      - echo $CLOUDFRONT_DISTRIBUTION_ID > cloudfront-id.txt
+      - echo Building frontend
       - cd ../../../frontend
       - npm ci
       - npm run build
 
   post_build:
     commands:
-      - echo "Build complete!"
-      - echo "S3 Bucket for deployment: $(cat ../bucket-name.txt)"
-      - echo "CloudFront Distribution ID: $(cat ../cloudfront-id.txt)"
-      - cp ../bucket-name.txt ../frontend/dist/
-      - cp ../cloudfront-id.txt ../frontend/dist/
+      - echo Build complete
+      - cp ../bucket-name.txt dist/
+      - cp ../cloudfront-id.txt dist/
 
 artifacts:
   files:
     - frontend/dist/**/*
     - bucket-name.txt
     - cloudfront-id.txt
-  base-directory: '.'
+  base-directory: .
   discard-paths: no
 
 cache:
