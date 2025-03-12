@@ -8,10 +8,6 @@ env:
     TERRAFORM_STATE_BUCKET: rizzlers-ibe-dev-tfstate
     TERRAFORM_STATE_KEY: frontend/terraform.tfstate
     TERRAFORM_STATE_REGION: ap-south-1
-  # We're not using parameter store credentials anymore as we'll use the CodeBuild role
-  # parameter-store:
-  #   AWS_ACCESS_KEY_ID: /rizzlers/access_id
-  #   AWS_SECRET_ACCESS_KEY: /rizzlers/secret_key
 
 phases:
   install:
@@ -194,11 +190,9 @@ phases:
       - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)
       - echo "CloudFront Distribution created with domain: $CLOUDFRONT_DOMAIN_NAME"
       - cd ../../../
-      # Build the React application
       - echo "Building the React application"
       - npm install
       - npm run build
-      # Deploy the built application to S3
       - aws s3 sync build/ s3://$S3_BUCKET_NAME/ --delete
       - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
 
@@ -208,7 +202,8 @@ phases:
       - echo "=============================================================="
       - echo "Your website is now available at: https://$CLOUDFRONT_DOMAIN_NAME"
       - echo "=============================================================="
-      - echo "S3 Website URL (origin): http://$(terraform output -raw s3_website_endpoint)"
+      - S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint)
+      - echo "S3 Website URL (origin): http://$S3_WEBSITE_ENDPOINT"
       - echo "CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
 
 artifacts:
