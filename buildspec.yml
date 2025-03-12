@@ -33,11 +33,13 @@ phases:
       - echo Creating Terraform configuration
       - ENVIRONMENT=dev
       - mkdir -p terraform/environments/$ENVIRONMENT
-      - echo 'terraform {
+      - |
+        cat > terraform/environments/$ENVIRONMENT/main.tf << 'EOF'
+        terraform {
           backend "s3" {
-            bucket = "'$TERRAFORM_STATE_BUCKET'"
-            key    = "'$TERRAFORM_STATE_KEY'"
-            region = "'$TERRAFORM_STATE_REGION'"
+            bucket = "rizzlers-ibe-dev-tfstate"
+            key    = "frontend/terraform.tfstate"
+            region = "ap-south-1"
           }
         }
 
@@ -173,8 +175,12 @@ phases:
 
         output "s3_website_endpoint" {
           value = aws_s3_bucket_website_configuration.frontend.website_endpoint
-        }' > terraform/environments/$ENVIRONMENT/main.tf
+        }
+        EOF
       - ls -la terraform/environments/$ENVIRONMENT
+      - sed -i "s/rizzlers-ibe-dev-tfstate/$TERRAFORM_STATE_BUCKET/g" terraform/environments/$ENVIRONMENT/main.tf
+      - sed -i "s!frontend/terraform.tfstate!$TERRAFORM_STATE_KEY!g" terraform/environments/$ENVIRONMENT/main.tf
+      - sed -i "s/ap-south-1/$TERRAFORM_STATE_REGION/g" terraform/environments/$ENVIRONMENT/main.tf
       - cd terraform/environments/$ENVIRONMENT
       - aws sts get-caller-identity
       - terraform init -reconfigure
