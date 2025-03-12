@@ -13,28 +13,17 @@ phases:
     runtime-versions:
       nodejs: $NODE_VERSION
     commands:
-      # Install Terraform
       - echo "Installing Terraform..."
       - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - unzip -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - mv terraform /usr/local/bin/
       - rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-      # Install AWS CLI
       - pip install --upgrade pip
       - pip install awscli --upgrade
 
   pre_build:
     commands:
-      # Determine environment based on branch
-      - |
-        if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then
-          ENVIRONMENT=dev
-        elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then
-          ENVIRONMENT=qa
-        else
-          echo "Branch not configured for deployment"
-          exit 1
-        fi
+      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then ENVIRONMENT=dev; elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then ENVIRONMENT=qa; else echo "Branch not configured for deployment"; exit 1; fi
       - echo "Deploying to $ENVIRONMENT environment"
       - export ENVIRONMENT=$ENVIRONMENT
       - cd terraform/environments/$ENVIRONMENT
@@ -75,4 +64,4 @@ artifacts:
 
 cache:
   paths:
-    - 'frontend/node_modules/**/*' 
+    - frontend/node_modules/**/* 
