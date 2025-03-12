@@ -189,7 +189,6 @@ phases:
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
       - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)
       - export S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint)
-      - echo "CloudFront Distribution created with domain: $CLOUDFRONT_DOMAIN_NAME"
       - cd ../../../
       - echo "Building the React application"
       - npm install
@@ -201,11 +200,7 @@ phases:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
-      - echo "Your website is now available at: https://$CLOUDFRONT_DOMAIN_NAME"
       - echo "=============================================================="
-      - echo "S3 Website URL (origin): http://$S3_WEBSITE_ENDPOINT"
-      - echo "CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
-
 artifacts:
   files:
     - build/**/*
