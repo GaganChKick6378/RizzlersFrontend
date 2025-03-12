@@ -1,51 +1,57 @@
 version: 0.2
 
-env:
-  variables:
-    TERRAFORM_VERSION: "1.5.0"
-
 phases:
   install:
     runtime-versions:
       nodejs: 18
-      python: 3.11
     commands:
+      # Install Terraform
+      - curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+      - sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+      - sudo apt-get update && sudo apt-get install terraform
+      # Install Yarn
       - npm install -g yarn
-      - wget https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-      - unzip terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-      - mv terraform /usr/local/bin/
-      - terraform --version
 
   pre_build:
     commands:
-      # Terraform Init and Plan
+      # Frontend Build
+      - echo "Building Frontend Application"
+      - cd frontend
+      - yarn install
+      - yarn build
+      - cd ..
+      # Save build output
+      - mv frontend/build ./frontend-build
+
+  build:
+    commands:
+      # Terraform Infrastructure Setup
+      - echo "Setting up Infrastructure with Terraform"
       - cd terraform/frontend
       - terraform init
       - terraform workspace select ${ENVIRONMENT} || terraform workspace new ${ENVIRONMENT}
       - terraform plan -var="environment=${ENVIRONMENT}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan
-      # Frontend Dependencies
-      - cd ../../
-      - echo Installing dependencies...
-      - yarn install
-
-  build:
-    commands:
-      # Apply Terraform Changes
-      - cd terraform/frontend
       - terraform apply -auto-approve tfplan
-      # Build Frontend
-      - cd ../../
-      - echo Building React application...
-      - yarn build
+      - cd ../..
 
   post_build:
     commands:
-      - echo Uploading to S3...
-      - aws s3 sync build/ s3://$S3_BUCKET/ --delete
-      - echo Creating CloudFront invalidation...
-      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+      # Deploy Frontend to S3
+      - echo "Deploying Frontend to S3"
+      - |
+        BUCKET_NAME="rizzlers-frontend-${ENVIRONMENT}"
+        aws s3 sync frontend-build/ s3://$BUCKET_NAME/ --delete
+      # Invalidate CloudFront
+      - |
+        DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Tags[?Key=='Environment'].Value, '${ENVIRONMENT}') && contains(Tags[?Key=='Name'].Value, 'rizzlers-frontend')].Id" --output text)
+        if [ ! -z "$DISTRIBUTION_ID" ]; then
+          echo "Invalidating CloudFront Distribution: $DISTRIBUTION_ID"
+          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+        fi
+      - echo "Deployment Complete!"
 
 artifacts:
   files:
-    - '**/*'
-  base-directory: build 
+    - frontend-build/**/*
+    - terraform/frontend/**/*
+  name: deployment-output
