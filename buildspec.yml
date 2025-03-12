@@ -31,10 +31,26 @@ phases:
       - echo Setting environment to dev
       - ENVIRONMENT=dev
       - echo Creating simple Terraform file
-      - echo 'provider "aws" {region = "ap-south-1"}' > terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_s3_bucket" "frontend" {bucket = "rizzlers-frontend-dev" tags = {Name = "Rizzlers-dev", Creator = "Rizzlers Team", Purpose = "IBE"}}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'output "s3_bucket_name" {value = aws_s3_bucket.frontend.bucket}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'output "cloudfront_distribution_id" {value = "dummy-id"}' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo 'provider "aws" {' > terraform/environments/$ENVIRONMENT/main.tf
+      - echo '  region = "ap-south-1"' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo 'resource "aws_s3_bucket" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '  bucket = "rizzlers-frontend-dev"' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '  tags = {' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '    Name = "Rizzlers-dev"' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '    Creator = "Rizzlers Team"' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '    Purpose = "IBE"' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo 'output "s3_bucket_name" {' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '  value = aws_s3_bucket.frontend.bucket' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo 'output "cloudfront_distribution_id" {' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '  value = "dummy-id"' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
       - cd terraform/environments/$ENVIRONMENT
       - terraform init
 
