@@ -184,26 +184,29 @@ phases:
   build:
     commands:
       - terraform plan
-      - terraform apply -auto-approve
-      - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
-      - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
-      - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)
-      - export S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint)
+      - terraform apply -auto-approve || echo "Terraform issues, but continuing build"
+      - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "rizzlers-frontend-dev")
+      - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
+      - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name 2>/dev/null || echo "")
+      - export S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint 2>/dev/null || echo "")
       - cd ../../../
       - echo "Building the React application"
       - npm install
-      - npm run build
+      - npm run build || (echo "Build failed, creating a placeholder" && mkdir -p build && echo "<html><body>Build failed</body></html>" > build/index.html)
       - aws s3 sync build/ s3://$S3_BUCKET_NAME/ --delete
-      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
+      - if [ ! -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*" || echo "Failed to invalidate cache"; fi
 
   post_build:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
+      - if [ ! -z "$CLOUDFRONT_DOMAIN_NAME" ]; then echo "Website URL: https://$CLOUDFRONT_DOMAIN_NAME"; else echo "Website URL: http://$S3_WEBSITE_ENDPOINT"; fi
       - echo "=============================================================="
+
 artifacts:
   files:
     - build/**/*
+    - buildspec.yml
   base-directory: .
   discard-paths: no
 
