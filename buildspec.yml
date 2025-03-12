@@ -30,143 +30,153 @@ phases:
 
   pre_build:
     commands:
-      - echo Creating directories
+      - echo Creating Terraform configuration
       - mkdir -p terraform/environments/dev
       - ENVIRONMENT=dev
-      - rm -f terraform/environments/$ENVIRONMENT/main.tf
-      - echo "Creating Terraform file with proper formatting"
-      # Create backend configuration for remote state storage
-      - echo 'terraform {' > terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  backend "s3" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    bucket = "'$TERRAFORM_STATE_BUCKET'"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    key    = "'$TERRAFORM_STATE_KEY'"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    region = "'$TERRAFORM_STATE_REGION'"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'provider "aws" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  region = "ap-south-1"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_s3_bucket" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  bucket = "rizzlers-frontend-dev"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  tags = {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    Name = "Rizzlers-dev"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    Creator = "Rizzlers Team"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    Purpose = "IBE"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_s3_bucket_public_access_block" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  bucket = aws_s3_bucket.frontend.id' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  block_public_acls       = false' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  block_public_policy     = false' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  ignore_public_acls      = false' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  restrict_public_buckets = false' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_s3_bucket_ownership_controls" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  bucket = aws_s3_bucket.frontend.id' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  rule {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    object_ownership = "BucketOwnerPreferred"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_s3_bucket_acl" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  depends_on = [' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    aws_s3_bucket_ownership_controls.frontend,' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    aws_s3_bucket_public_access_block.frontend,' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  ]' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  bucket = aws_s3_bucket.frontend.id' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  acl    = "public-read"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_s3_bucket_website_configuration" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  bucket = aws_s3_bucket.frontend.id' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  index_document {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    suffix = "index.html"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  error_document {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    key = "index.html"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_cloudfront_origin_access_identity" "origin_access_identity" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  comment = "rizzlers-frontend-dev-OAI"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'resource "aws_cloudfront_distribution" "frontend" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  enabled             = true' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  is_ipv6_enabled     = true' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  default_root_object = "index.html"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  comment             = "Rizzlers Frontend Distribution"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  price_class         = "PriceClass_200"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  wait_for_deployment = false' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  origin {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    domain_name = aws_s3_bucket_website_configuration.frontend.website_endpoint' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    origin_id   = "S3-${aws_s3_bucket.frontend.bucket}"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    custom_origin_config {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      http_port              = 80' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      https_port             = 443' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      origin_protocol_policy = "http-only"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      origin_ssl_protocols   = ["TLSv1.2"]' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  default_cache_behavior {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    allowed_methods  = ["GET", "HEAD", "OPTIONS"]' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    cached_methods   = ["GET", "HEAD"]' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    target_origin_id = "S3-${aws_s3_bucket.frontend.bucket}"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    forwarded_values {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      query_string = false' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      cookies {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '        forward = "none"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    viewer_protocol_policy = "redirect-to-https"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    min_ttl                = 0' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    default_ttl            = 3600' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    max_ttl                = 86400' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  # This is important for SPA applications to handle client-side routing' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  custom_error_response {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    error_code         = 403' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    response_code      = 200' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    response_page_path = "/index.html"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  custom_error_response {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    error_code         = 404' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    response_code      = 200' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    response_page_path = "/index.html"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  restrictions {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    geo_restriction {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '      restriction_type = "none"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  viewer_certificate {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    cloudfront_default_certificate = true' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  tags = {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    Name = "Rizzlers-dev-cloudfront"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    Creator = "Rizzlers Team"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '    Purpose = "IBE"' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  }' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'output "s3_bucket_name" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  value = aws_s3_bucket.frontend.bucket' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'output "cloudfront_distribution_id" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  value = aws_cloudfront_distribution.frontend.id' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'output "cloudfront_domain_name" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  value = aws_cloudfront_distribution.frontend.domain_name' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo 'output "s3_website_endpoint" {' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '  value = aws_s3_bucket_website_configuration.frontend.website_endpoint' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
-      - echo "Showing generated Terraform file content:"
+      - |
+        cat > terraform/environments/$ENVIRONMENT/main.tf << EOF
+        terraform {
+          backend "s3" {
+            bucket = "${TERRAFORM_STATE_BUCKET}"
+            key    = "${TERRAFORM_STATE_KEY}"
+            region = "${TERRAFORM_STATE_REGION}"
+          }
+        }
+
+        provider "aws" {
+          region = "ap-south-1"
+        }
+
+        resource "aws_s3_bucket" "frontend" {
+          bucket = "rizzlers-frontend-dev"
+          tags = {
+            Name = "Rizzlers-dev"
+            Creator = "Rizzlers Team"
+            Purpose = "IBE"
+          }
+        }
+
+        resource "aws_s3_bucket_public_access_block" "frontend" {
+          bucket = aws_s3_bucket.frontend.id
+          block_public_acls       = false
+          block_public_policy     = false
+          ignore_public_acls      = false
+          restrict_public_buckets = false
+        }
+
+        resource "aws_s3_bucket_ownership_controls" "frontend" {
+          bucket = aws_s3_bucket.frontend.id
+          rule {
+            object_ownership = "BucketOwnerPreferred"
+          }
+        }
+
+        resource "aws_s3_bucket_acl" "frontend" {
+          depends_on = [
+            aws_s3_bucket_ownership_controls.frontend,
+            aws_s3_bucket_public_access_block.frontend,
+          ]
+          bucket = aws_s3_bucket.frontend.id
+          acl    = "public-read"
+        }
+
+        resource "aws_s3_bucket_website_configuration" "frontend" {
+          bucket = aws_s3_bucket.frontend.id
+          index_document {
+            suffix = "index.html"
+          }
+          error_document {
+            key = "index.html"
+          }
+        }
+
+        resource "aws_cloudfront_origin_access_identity" "origin_access_identity" {
+          comment = "rizzlers-frontend-dev-OAI"
+        }
+
+        resource "aws_cloudfront_distribution" "frontend" {
+          enabled             = true
+          is_ipv6_enabled     = true
+          default_root_object = "index.html"
+          comment             = "Rizzlers Frontend Distribution"
+          price_class         = "PriceClass_200"
+          wait_for_deployment = false
+
+          origin {
+            domain_name = aws_s3_bucket_website_configuration.frontend.website_endpoint
+            origin_id   = "S3-\${aws_s3_bucket.frontend.bucket}"
+
+            custom_origin_config {
+              http_port              = 80
+              https_port             = 443
+              origin_protocol_policy = "http-only"
+              origin_ssl_protocols   = ["TLSv1.2"]
+            }
+          }
+
+          default_cache_behavior {
+            allowed_methods  = ["GET", "HEAD", "OPTIONS"]
+            cached_methods   = ["GET", "HEAD"]
+            target_origin_id = "S3-\${aws_s3_bucket.frontend.bucket}"
+
+            forwarded_values {
+              query_string = false
+              cookies {
+                forward = "none"
+              }
+            }
+
+            viewer_protocol_policy = "redirect-to-https"
+            min_ttl                = 0
+            default_ttl            = 3600
+            max_ttl                = 86400
+          }
+
+          custom_error_response {
+            error_code         = 403
+            response_code      = 200
+            response_page_path = "/index.html"
+          }
+
+          custom_error_response {
+            error_code         = 404
+            response_code      = 200
+            response_page_path = "/index.html"
+          }
+
+          restrictions {
+            geo_restriction {
+              restriction_type = "none"
+            }
+          }
+
+          viewer_certificate {
+            cloudfront_default_certificate = true
+          }
+
+          tags = {
+            Name = "Rizzlers-dev-cloudfront"
+            Creator = "Rizzlers Team"
+            Purpose = "IBE"
+          }
+        }
+
+        output "s3_bucket_name" {
+          value = aws_s3_bucket.frontend.bucket
+        }
+
+        output "cloudfront_distribution_id" {
+          value = aws_cloudfront_distribution.frontend.id
+        }
+
+        output "cloudfront_domain_name" {
+          value = aws_cloudfront_distribution.frontend.domain_name
+        }
+
+        output "s3_website_endpoint" {
+          value = aws_s3_bucket_website_configuration.frontend.website_endpoint
+        }
+        EOF
       - cat terraform/environments/$ENVIRONMENT/main.tf
       - aws sts get-caller-identity
       - cd terraform/environments/$ENVIRONMENT
@@ -174,9 +184,9 @@ phases:
 
   build:
     commands:
-      - echo "Running Terraform plan to see what would be created:"
+      - echo "Running Terraform plan"
       - terraform plan
-      - echo "Trying to apply Terraform changes:"
+      - echo "Applying Terraform changes"
       - terraform apply -auto-approve || echo "Terraform failed but continuing build"
       - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "rizzlers-frontend-dev")
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "dummy-id")
@@ -193,19 +203,13 @@ phases:
       - cp terraform/environments/$ENVIRONMENT/cloudfront-id.txt frontend/dist/ || echo "dummy-id" > frontend/dist/cloudfront-id.txt
       - cp terraform/environments/$ENVIRONMENT/cloudfront-domain.txt frontend/dist/ || echo "dummy-domain" > frontend/dist/cloudfront-domain.txt
       - cp terraform/environments/$ENVIRONMENT/s3-website-endpoint.txt frontend/dist/ || echo "dummy-endpoint" > frontend/dist/s3-website-endpoint.txt
-      - echo "Deploying frontend artifacts to S3 bucket"
       - aws s3 sync frontend/dist/ s3://$S3_BUCKET_NAME/ --delete
-      - echo "Creating CloudFront invalidation to refresh cache"
       - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*" || echo "CloudFront invalidation failed but continuing"
 
   post_build:
     commands:
-      - echo Build complete
-      - echo "Making sure artifact directories and files exist:"
-      - mkdir -p frontend/dist
-      - touch frontend/dist/index.html
-      - echo "rizzlers-frontend-dev" > frontend/dist/bucket-name.txt
-      - echo "Check the following URLs for your deployment:"
+      - echo "Build complete"
+      - echo "Checking deployment URLs:"
       - echo "S3 Website: http://$S3_WEBSITE_ENDPOINT"
       - echo "CloudFront: https://$CLOUDFRONT_DOMAIN_NAME"
       - ls -la frontend/dist
