@@ -15,7 +15,7 @@ phases:
     commands:
       - echo Installing Terraform
       - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
-      - unzip -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+      - unzip -o -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - mv terraform /usr/local/bin/
       - rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - pip install --upgrade pip
