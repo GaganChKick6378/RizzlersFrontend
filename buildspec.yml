@@ -32,7 +32,7 @@ phases:
       - ls -la
       # Terraform Infrastructure Setup
       - echo "Setting up Infrastructure with Terraform"
-      - cd terraform/frontend
+      - if [ -d "terraform/frontend" ]; then cd terraform/frontend; else echo "Directory terraform/frontend does not exist"; exit 1; fi
       - terraform init
       - terraform workspace select ${ENVIRONMENT} || terraform workspace new ${ENVIRONMENT}
       - terraform plan -var="environment=${ENVIRONMENT}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan
