@@ -5,9 +5,10 @@ env:
     TERRAFORM_VERSION: 1.5.7
     NODE_VERSION: 18
     DEFAULT_ENVIRONMENT: dev
-  parameter-store:
-    AWS_ACCESS_KEY_ID: /rizzlers/access_id
-    AWS_SECRET_ACCESS_KEY: /rizzlers/secret_key
+  # We're not using parameter store credentials anymore as we'll use the CodeBuild role
+  # parameter-store:
+  #   AWS_ACCESS_KEY_ID: /rizzlers/access_id
+  #   AWS_SECRET_ACCESS_KEY: /rizzlers/secret_key
 
 phases:
   install:
@@ -27,10 +28,10 @@ phases:
   pre_build:
     commands:
       - echo Creating directories
-      - mkdir -p terraform/environments/dev terraform/environments/qa
-      - echo Setting environment to dev
+      - mkdir -p terraform/environments/dev
       - ENVIRONMENT=dev
-      - echo Creating simple Terraform file
+      - rm -f terraform/environments/$ENVIRONMENT/main.tf
+      - echo "Creating Terraform file with proper formatting"
       - echo 'provider "aws" {' > terraform/environments/$ENVIRONMENT/main.tf
       - echo '  region = "ap-south-1"' >> terraform/environments/$ENVIRONMENT/main.tf
       - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
@@ -51,8 +52,11 @@ phases:
       - echo 'output "cloudfront_distribution_id" {' >> terraform/environments/$ENVIRONMENT/main.tf
       - echo '  value = "dummy-id"' >> terraform/environments/$ENVIRONMENT/main.tf
       - echo '}' >> terraform/environments/$ENVIRONMENT/main.tf
+      - echo "Showing generated Terraform file content:"
+      - cat terraform/environments/$ENVIRONMENT/main.tf
+      - aws sts get-caller-identity
       - cd terraform/environments/$ENVIRONMENT
-      - terraform init
+      - terraform init -reconfigure
 
   build:
     commands:
