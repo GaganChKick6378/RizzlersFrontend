@@ -36,33 +36,22 @@ phases:
           exit 1
         fi
       - echo "Deploying to $ENVIRONMENT environment"
-      
-      # Set environment variables
       - export ENVIRONMENT=$ENVIRONMENT
       - cd terraform/environments/$ENVIRONMENT
-      
-      # Initialize Terraform
       - echo "Initializing Terraform..."
       - terraform init
 
   build:
     commands:
-      # Apply Terraform
       - echo "Applying Terraform..."
       - terraform apply -auto-approve
-      
-      # Get S3 bucket name and CloudFront distribution ID from Terraform outputs
       - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
       - echo "S3 Bucket: $S3_BUCKET_NAME"
       - echo "CloudFront Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
-      
-      # Store outputs as environment variables for CodePipeline
       - echo "Writing bucket info to file for deployment stage..."
       - echo "$S3_BUCKET_NAME" > bucket-name.txt
       - echo "$CLOUDFRONT_DISTRIBUTION_ID" > cloudfront-id.txt
-      
-      # Build frontend
       - echo "Building frontend..."
       - cd ../../../frontend
       - npm ci
