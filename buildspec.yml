@@ -184,7 +184,6 @@ phases:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
-      - echo "Your website is available at: https://$CLOUDFRONT_DOMAIN_NAME"
       - echo "=============================================================="
 
 artifacts:
