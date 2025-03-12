@@ -1,0 +1,76 @@
+name: "Initial Infrastructure Setup"
+
+on:
+  # Only manual trigger for infrastructure setup
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy (dev/qa)'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: ap-south-1
+  TERRAFORM_VERSION: "1.5.0"
+
+jobs:
+  terraform:
+    name: "Setup AWS Infrastructure"
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Init
+        working-directory: terraform/frontend
+        run: |
+          terraform init
+          terraform workspace select ${{ github.event.inputs.environment }} || terraform workspace new ${{ github.event.inputs.environment }}
+
+      - name: Terraform Plan
+        working-directory: terraform/frontend
+        run: |
+          terraform plan \
+            -var="environment=${{ github.event.inputs.environment }}" \
+            -var="frontend_bucket_name=rizzlers-frontend" \
+            -out=tfplan
+
+      - name: Manual Approval for QA
+        if: github.event.inputs.environment == 'qa'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.token }}
+          approvers: GaganChKick6378
+          minimum-approvals: 1
+          issue-title: "Deploy Infrastructure to QA"
+          issue-body: |
+            Please approve the initial infrastructure deployment to QA environment.
+            This will set up:
+            - S3 bucket for frontend hosting
+            - CloudFront distribution
+            - CodeBuild/CodePipeline for automated deployments
+            - Required IAM roles and policies
+
+      - name: Terraform Apply
+        working-directory: terraform/frontend
+        run: terraform apply -auto-approve tfplan 
