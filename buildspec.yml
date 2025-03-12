@@ -31,12 +31,9 @@ phases:
   pre_build:
     commands:
       - echo Creating Terraform configuration
-      - mkdir -p terraform/environments/dev
       - ENVIRONMENT=dev
       - mkdir -p terraform/environments/$ENVIRONMENT
-      - |
-        cd terraform/environments/$ENVIRONMENT && \
-        echo 'terraform {
+      - echo 'terraform {
           backend "s3" {
             bucket = "'$TERRAFORM_STATE_BUCKET'"
             key    = "'$TERRAFORM_STATE_KEY'"
@@ -176,8 +173,8 @@ phases:
 
         output "s3_website_endpoint" {
           value = aws_s3_bucket_website_configuration.frontend.website_endpoint
-        }' > main.tf
-
+        }' > terraform/environments/$ENVIRONMENT/main.tf
+      - ls -la terraform/environments/$ENVIRONMENT
       - cd terraform/environments/$ENVIRONMENT
       - aws sts get-caller-identity
       - terraform init -reconfigure
