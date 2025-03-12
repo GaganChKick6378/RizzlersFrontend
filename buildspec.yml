@@ -7,7 +7,7 @@ phases:
     commands:
       # Install Terraform without using GPG keyring
       - wget https://releases.hashicorp.com/terraform/1.5.0/terraform_1.5.0_linux_amd64.zip
-      - unzip terraform_1.5.0_linux_amd64.zip
+      - unzip -o terraform_1.5.0_linux_amd64.zip
       - sudo mv terraform /usr/local/bin/
       # Install Yarn
       - npm install -g yarn
@@ -33,23 +33,10 @@ phases:
 
   post_build:
     commands:
-      # Deploy Frontend to S3 (which was just created by Terraform)
-      - echo "Deploying Frontend to S3"
-      - |
-        BUCKET_NAME="rizzlers-frontend-${ENVIRONMENT}"
-        echo "Deploying to bucket: $BUCKET_NAME"
-        aws s3 sync build/ s3://$BUCKET_NAME/ --delete
-      # Invalidate CloudFront
-      - |
-        DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Tags[?Key=='Environment'].Value, '${ENVIRONMENT}') && contains(Tags[?Key=='Name'].Value, 'rizzlers-frontend')].Id" --output text)
-        if [ ! -z "$DISTRIBUTION_ID" ]; then
-          echo "Invalidating CloudFront Distribution: $DISTRIBUTION_ID"
-          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
-        fi
-      - echo "Deployment Complete!"
+      - echo "Build and Infrastructure setup complete"
 
 artifacts:
   files:
     - build/**/*
-    - terraform/frontend/**/*
-  name: deployment-output
+  base-directory: build
+  name: frontend-build
