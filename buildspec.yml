@@ -7,62 +7,54 @@ phases:
     commands:
       # Install Terraform without using GPG keyring
       - wget https://releases.hashicorp.com/terraform/1.5.0/terraform_1.5.0_linux_amd64.zip
-      - rm -rf terraform  # Remove any existing terraform directory
-      - unzip -o terraform_1.5.0_linux_amd64.zip
-      - sudo mv terraform /usr/local/bin/
+      - rm -rf terraform_bin  # Use a temporary directory to avoid confusion
+      - mkdir -p terraform_bin
+      - unzip -o terraform_1.5.0_linux_amd64.zip -d terraform_bin
+      - sudo mv terraform_bin/terraform /usr/local/bin/
+      - rm -rf terraform_bin
       # Install Yarn
       - npm install -g yarn
       # Debug: Check repository structure
       - echo "Repository root contents:"
       - ls -la
-      - echo "Current working directory:"
-      - pwd
 
   build:
     commands:
       # STEP 1: TERRAFORM INFRASTRUCTURE SETUP
       - echo "Setting up Infrastructure with Terraform"
-      # Check if terraform directory exists
-      - if [ -d "terraform" ]; then
-          echo "Terraform directory exists. Listing contents:";
-          ls -la terraform;
-          if [ -d "terraform/frontend" ]; then
-            cd terraform/frontend;
-            terraform init;
-            terraform workspace select ${ENVIRONMENT} || terraform workspace new ${ENVIRONMENT};
-            terraform plan -var="environment=${ENVIRONMENT}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan;
-            terraform apply -auto-approve tfplan;
-            cd ../..;
-            echo "Terraform infrastructure created successfully";
-          else
-            echo "terraform/frontend directory not found";
-            exit 1;
-          fi
-        else
-          echo "Terraform directory not found";
-          exit 1;
-        fi
+      - cd terraform/frontend
+      - terraform init
+      - terraform workspace select ${ENVIRONMENT:-dev} || terraform workspace new ${ENVIRONMENT:-dev}
+      - terraform plan -var="environment=${ENVIRONMENT:-dev}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan
+      - terraform apply -auto-approve tfplan
+      - BUCKET_NAME=$(terraform output -raw frontend_bucket_name || echo "rizzlers-frontend-${ENVIRONMENT:-dev}")
+      - DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id || echo "")
+      - cd ../..
 
   post_build:
     commands:
       # STEP 2: FRONTEND BUILD (after infrastructure is ready)
       - echo "Building Frontend Application"
-      - if [ -d "frontend" ]; then
-          cd frontend;
-          yarn install;
-          yarn build;
-          echo "Frontend build completed";
-          cd ..;
-        else
-          echo "Frontend directory not found";
-          exit 1;
-        fi
+      - cd frontend
+      - yarn install
+      - yarn build
+      - echo "Frontend build completed"
       
-      # STEP 3: USE TERRAFORM-CREATED RESOURCES
+      # STEP 3: DEPLOY TO S3 AND INVALIDATE CLOUDFRONT
+      - echo "Deploying to S3 bucket: $BUCKET_NAME"
+      - aws s3 sync dist/ s3://$BUCKET_NAME/ --delete
+      - if [ ! -z "$DISTRIBUTION_ID" ]; then
+          echo "Invalidating CloudFront distribution: $DISTRIBUTION_ID";
+          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*";
+        else
+          echo "No CloudFront distribution ID found. Skipping invalidation.";
+        fi
+      - cd ..
       - echo "Deployment complete"
 
 artifacts:
   files:
     - '**/*'
-  base-directory: frontend/build
+  base-directory: frontend/dist
+  discard-paths: no
   name: frontend-build
