@@ -193,8 +193,6 @@ phases:
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
       - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)
       - echo "CloudFront Distribution created with domain: $CLOUDFRONT_DOMAIN_NAME"
-      
-      # Create a proper frontend page
       - cd ../../../
       - mkdir -p frontend/dist
       - |
@@ -245,8 +243,6 @@ phases:
         </body>
         </html>
         EOF
-      
-      # Deploy to S3 and invalidate CloudFront cache
       - aws s3 sync frontend/dist/ s3://$S3_BUCKET_NAME/ --delete
       - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
 
@@ -267,4 +263,4 @@ artifacts:
 
 cache:
   paths:
-    - frontend/node_modules/**/* 
+    - frontend/node_modules/**/*
