@@ -7,9 +7,10 @@ phases:
     commands:
       # Install Terraform without using GPG keyring
       - wget https://releases.hashicorp.com/terraform/1.5.0/terraform_1.5.0_linux_amd64.zip
-      - unzip -o terraform_1.5.0_linux_amd64.zip
+      - rm -rf terraform  # Remove any existing terraform directory
+      - unzip terraform_1.5.0_linux_amd64.zip
       - sudo mv terraform /usr/local/bin/
-      # Install Yarn
+      # Install Yarns
       - npm install -g yarn
 
   pre_build:
