@@ -27,9 +27,12 @@ phases:
 
   build:
     commands:
+      # Debug: List current directory contents
+      - echo "Listing current directory contents"
+      - ls -la
       # Terraform Infrastructure Setup
       - echo "Setting up Infrastructure with Terraform"
-      - cd terraform/frontend
+      - if [ -d "terraform/frontend" ]; then cd terraform/frontend; else echo "Directory terraform/frontend does not exist"; exit 1; fi
       - terraform init
       - terraform workspace select ${ENVIRONMENT} || terraform workspace new ${ENVIRONMENT}
       - terraform plan -var="environment=${ENVIRONMENT}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan
@@ -42,6 +45,6 @@ phases:
 
 artifacts:
   files:
-    - build/**/*
+    - '**/*'
   base-directory: frontend/build
   name: frontend-build
