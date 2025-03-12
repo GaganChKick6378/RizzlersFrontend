@@ -15,8 +15,8 @@ phases:
       nodejs: $NODE_VERSION
     commands:
       - echo Installing Terraform
-      - rm -rf terraform/ # Remove terraform directory if it exists
-      - rm -f terraform # Remove terraform file if it exists
+      - rm -rf terraform/
+      - rm -f terraform
       - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - unzip -o -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - mv terraform /usr/local/bin/
@@ -202,16 +202,15 @@ phases:
       - echo "=============================================================="
       - echo "Your website is now available at: https://$CLOUDFRONT_DOMAIN_NAME"
       - echo "=============================================================="
-      - S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint)
-      - echo "S3 Website URL (origin): http://$S3_WEBSITE_ENDPOINT"
+      - echo "S3 Website URL (origin): http://$(terraform output -raw s3_website_endpoint)"
       - echo "CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
 
 artifacts:
   files:
-    - frontend/dist/**/*
+    - build/**/*
   base-directory: .
   discard-paths: no
 
 cache:
   paths:
-    - frontend/node_modules/**/*
+    - node_modules/**/*
