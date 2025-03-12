@@ -1,60 +1,87 @@
 version: 0.2
 
+env:
+  variables:
+    TERRAFORM_VERSION: "1.5.7"
+    NODE_VERSION: "18"
+  parameter-store:
+    AWS_ACCESS_KEY_ID: "/rizzlers/access_id"
+    AWS_SECRET_ACCESS_KEY: "/rizzlers/secret_key"
+
 phases:
   install:
     runtime-versions:
-      nodejs: 18
+      nodejs: $NODE_VERSION
     commands:
-      # Install Terraform without using GPG keyring
-      - wget https://releases.hashicorp.com/terraform/1.5.0/terraform_1.5.0_linux_amd64.zip
-      - rm -rf terraform_bin  # Use a temporary directory to avoid confusion
-      - mkdir -p terraform_bin
-      - unzip -o terraform_1.5.0_linux_amd64.zip -d terraform_bin
-      - sudo mv terraform_bin/terraform /usr/local/bin/
-      - rm -rf terraform_bin
-      # Install Yarn
-      - npm install -g yarn
-      # Debug: Check repository structure
-      - echo "Repository root contents:"
-      - ls -la
+      # Install Terraform
+      - echo "Installing Terraform..."
+      - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+      - unzip -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+      - mv terraform /usr/local/bin/
+      - rm terraform_${TERRAFORM_VERSION}_linux_amd64.zip
+      # Install AWS CLI
+      - pip install --upgrade pip
+      - pip install awscli --upgrade
+
+  pre_build:
+    commands:
+      # Determine environment based on branch
+      - |
+        if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then
+          ENVIRONMENT=dev
+        elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then
+          ENVIRONMENT=qa
+        else
+          echo "Branch not configured for deployment"
+          exit 1
+        fi
+      - echo "Deploying to $ENVIRONMENT environment"
+      
+      # Set environment variables
+      - export ENVIRONMENT=$ENVIRONMENT
+      - cd terraform/environments/$ENVIRONMENT
+      
+      # Initialize Terraform
+      - echo "Initializing Terraform..."
+      - terraform init
 
   build:
     commands:
-      # STEP 1: TERRAFORM INFRASTRUCTURE SETUP
-      - echo "Setting up Infrastructure with Terraform"
-      - cd terraform/frontend
-      - terraform init
-      - terraform workspace select ${ENVIRONMENT:-dev} || terraform workspace new ${ENVIRONMENT:-dev}
-      - terraform plan -var="environment=${ENVIRONMENT:-dev}" -var="frontend_bucket_name=rizzlers-frontend" -out=tfplan
-      - terraform apply -auto-approve tfplan
-      - BUCKET_NAME=$(terraform output -raw frontend_bucket_name || echo "rizzlers-frontend-${ENVIRONMENT:-dev}")
-      - DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id || echo "")
-      - cd ../..
+      # Apply Terraform
+      - echo "Applying Terraform..."
+      - terraform apply -auto-approve
+      
+      # Get S3 bucket name and CloudFront distribution ID from Terraform outputs
+      - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
+      - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
+      - echo "S3 Bucket: $S3_BUCKET_NAME"
+      - echo "CloudFront Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
+      
+      # Build frontend
+      - echo "Building frontend..."
+      - cd ../../../frontend
+      - npm ci
+      - npm run build
+      
+      # Deploy to S3
+      - echo "Deploying to S3..."
+      - aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete
+      
+      # Invalidate CloudFront cache
+      - echo "Invalidating CloudFront cache..."
+      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
 
   post_build:
     commands:
-      # STEP 2: FRONTEND BUILD (after infrastructure is ready)
-      - echo "Building Frontend Application"
-      - cd frontend
-      - yarn install
-      - yarn build
-      - echo "Frontend build completed"
-      
-      # STEP 3: DEPLOY TO S3 AND INVALIDATE CLOUDFRONT
-      - echo "Deploying to S3 bucket: $BUCKET_NAME"
-      - aws s3 sync dist/ s3://$BUCKET_NAME/ --delete
-      - if [ ! -z "$DISTRIBUTION_ID" ]; then
-          echo "Invalidating CloudFront distribution: $DISTRIBUTION_ID";
-          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*";
-        else
-          echo "No CloudFront distribution ID found. Skipping invalidation.";
-        fi
-      - cd ..
-      - echo "Deployment complete"
+      - echo "Deployment complete!"
+      - echo "Website URL: $(cd ../terraform/environments/$ENVIRONMENT && terraform output -raw website_url)"
 
 artifacts:
   files:
-    - '**/*'
-  base-directory: frontend/dist
+    - frontend/dist/**/*
+  base-directory: '.'
   discard-paths: no
-  name: frontend-build
+
+cache:
+  paths:
+    - 'frontend/node_modules/**/*' 
