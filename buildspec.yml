@@ -4,6 +4,7 @@ env:
   variables:
     TERRAFORM_VERSION: 1.5.7
     NODE_VERSION: 18
+    DEFAULT_ENVIRONMENT: dev
   parameter-store:
     AWS_ACCESS_KEY_ID: /rizzlers/access_id
     AWS_SECRET_ACCESS_KEY: /rizzlers/secret_key
@@ -25,11 +26,37 @@ phases:
 
   pre_build:
     commands:
-      - if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then ENVIRONMENT=dev; elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then ENVIRONMENT=qa; else echo Branch not configured for deployment; exit 1; fi
-      - echo Deploying to $ENVIRONMENT environment
+      - |
+        # Determine environment based on branch or use default
+        if [ -n "$CODEBUILD_WEBHOOK_HEAD_REF" ]; then
+          # This is a webhook-triggered build
+          if [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/dev" ]; then
+            ENVIRONMENT=dev
+          elif [ "$CODEBUILD_WEBHOOK_HEAD_REF" = "refs/heads/qa" ]; then
+            ENVIRONMENT=qa
+          else
+            echo "Branch $CODEBUILD_WEBHOOK_HEAD_REF not configured, using default"
+            ENVIRONMENT=$DEFAULT_ENVIRONMENT
+          fi
+        elif [ -n "$CODEBUILD_SOURCE_VERSION" ]; then
+          # This might be a git branch name
+          if [ "$CODEBUILD_SOURCE_VERSION" = "dev" ]; then
+            ENVIRONMENT=dev
+          elif [ "$CODEBUILD_SOURCE_VERSION" = "qa" ]; then
+            ENVIRONMENT=qa
+          else
+            echo "Source version $CODEBUILD_SOURCE_VERSION not configured, using default"
+            ENVIRONMENT=$DEFAULT_ENVIRONMENT
+          fi
+        else
+          # Manual build or other trigger
+          echo "Manual build detected, using default environment"
+          ENVIRONMENT=$DEFAULT_ENVIRONMENT
+        fi
+      - echo "Deploying to $ENVIRONMENT environment"
       - export ENVIRONMENT=$ENVIRONMENT
       - cd terraform/environments/$ENVIRONMENT
-      - echo Initializing Terraform
+      - echo "Initializing Terraform..."
       - terraform init
 
   build:
