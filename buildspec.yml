@@ -19,6 +19,8 @@ phases:
       nodejs: $NODE_VERSION
     commands:
       - echo Installing Terraform
+      - rm -rf terraform/ # Remove terraform directory if it exists
+      - rm -f terraform # Remove terraform file if it exists
       - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - unzip -o -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - mv terraform /usr/local/bin/
