@@ -15,7 +15,7 @@ phases:
       nodejs: $NODE_VERSION
     commands:
       - echo Installing Terraform
-      - rm -rf terraform/
+      - rm -rf terraform/  # Clean up if exists
       - rm -f terraform
       - wget -q https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip
       - unzip -o -q terraform_${TERRAFORM_VERSION}_linux_amd64.zip
@@ -43,17 +43,13 @@ phases:
           region = "ap-south-1"
         }
 
-        resource "aws_s3_bucket" "frontend" {
+        # Reference existing S3 bucket instead of creating it
+        data "aws_s3_bucket" "frontend" {
           bucket = "rizzlers-frontend-dev"
-          tags = {
-            Name = "Rizzlers-dev"
-            Creator = "Rizzlers Team"
-            Purpose = "IBE"
-          }
         }
 
         resource "aws_s3_bucket_public_access_block" "frontend" {
-          bucket = aws_s3_bucket.frontend.id
+          bucket = data.aws_s3_bucket.frontend.id
           block_public_acls       = false
           block_public_policy     = false
           ignore_public_acls      = false
@@ -61,7 +57,7 @@ phases:
         }
 
         resource "aws_s3_bucket_ownership_controls" "frontend" {
-          bucket = aws_s3_bucket.frontend.id
+          bucket = data.aws_s3_bucket.frontend.id
           rule {
             object_ownership = "BucketOwnerPreferred"
           }
@@ -72,22 +68,18 @@ phases:
             aws_s3_bucket_ownership_controls.frontend,
             aws_s3_bucket_public_access_block.frontend,
           ]
-          bucket = aws_s3_bucket.frontend.id
+          bucket = data.aws_s3_bucket.frontend.id
           acl    = "public-read"
         }
 
         resource "aws_s3_bucket_website_configuration" "frontend" {
-          bucket = aws_s3_bucket.frontend.id
+          bucket = data.aws_s3_bucket.frontend.id
           index_document {
             suffix = "index.html"
           }
           error_document {
             key = "index.html"
           }
-        }
-
-        resource "aws_cloudfront_origin_access_identity" "origin_access_identity" {
-          comment = "rizzlers-frontend-dev-OAI"
         }
 
         resource "aws_cloudfront_distribution" "frontend" {
@@ -100,7 +92,7 @@ phases:
 
           origin {
             domain_name = aws_s3_bucket_website_configuration.frontend.website_endpoint
-            origin_id   = "S3-${aws_s3_bucket.frontend.bucket}"
+            origin_id   = "S3-${data.aws_s3_bucket.frontend.bucket}"
 
             custom_origin_config {
               http_port              = 80
@@ -113,15 +105,13 @@ phases:
           default_cache_behavior {
             allowed_methods  = ["GET", "HEAD", "OPTIONS"]
             cached_methods   = ["GET", "HEAD"]
-            target_origin_id = "S3-${aws_s3_bucket.frontend.bucket}"
-
+            target_origin_id = "S3-${data.aws_s3_bucket.frontend.bucket}"
             forwarded_values {
               query_string = false
               cookies {
                 forward = "none"
               }
             }
-
             viewer_protocol_policy = "redirect-to-https"
             min_ttl                = 0
             default_ttl            = 3600
@@ -158,7 +148,7 @@ phases:
         }
 
         output "s3_bucket_name" {
-          value = aws_s3_bucket.frontend.bucket
+          value = data.aws_s3_bucket.frontend.bucket
         }
 
         output "cloudfront_distribution_id" {
@@ -173,23 +163,17 @@ phases:
           value = aws_s3_bucket_website_configuration.frontend.website_endpoint
         }
         EOF
-      - ls -la terraform/environments/$ENVIRONMENT
-      - sed -i "s/rizzlers-ibe-dev-tfstate/$TERRAFORM_STATE_BUCKET/g" terraform/environments/$ENVIRONMENT/main.tf
-      - sed -i "s!frontend/terraform.tfstate!$TERRAFORM_STATE_KEY!g" terraform/environments/$ENVIRONMENT/main.tf
-      - sed -i "s/ap-south-1/$TERRAFORM_STATE_REGION/g" terraform/environments/$ENVIRONMENT/main.tf
       - cd terraform/environments/$ENVIRONMENT
-      - aws sts get-caller-identity
       - terraform init -reconfigure
 
   build:
     commands:
-      - terraform plan
       - terraform apply -auto-approve
       - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
       - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)
-      - export S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint)
-      - cd ../../../
+      - cd ../../..  # Back to root
+      - cd frontend  # Enter frontend directory
       - echo "Building the React application"
       - npm install
       - npm run build
@@ -200,13 +184,15 @@ phases:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
+      - echo "Your website is available at: https://$CLOUDFRONT_DOMAIN_NAME"
       - echo "=============================================================="
+
 artifacts:
   files:
-    - build/**/*
+    - frontend/build/**/*
   base-directory: .
   discard-paths: no
 
 cache:
   paths:
-    - node_modules/**/*
+    - frontend/node_modules/**/*
