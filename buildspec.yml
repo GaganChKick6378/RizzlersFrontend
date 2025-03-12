@@ -57,28 +57,30 @@ phases:
       - echo "S3 Bucket: $S3_BUCKET_NAME"
       - echo "CloudFront Distribution: $CLOUDFRONT_DISTRIBUTION_ID"
       
+      # Store outputs as environment variables for CodePipeline
+      - echo "Writing bucket info to file for deployment stage..."
+      - echo "$S3_BUCKET_NAME" > bucket-name.txt
+      - echo "$CLOUDFRONT_DISTRIBUTION_ID" > cloudfront-id.txt
+      
       # Build frontend
       - echo "Building frontend..."
       - cd ../../../frontend
       - npm ci
       - npm run build
-      
-      # Deploy to S3
-      - echo "Deploying to S3..."
-      - aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete
-      
-      # Invalidate CloudFront cache
-      - echo "Invalidating CloudFront cache..."
-      - aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*"
 
   post_build:
     commands:
-      - echo "Deployment complete!"
-      - echo "Website URL: $(cd ../terraform/environments/$ENVIRONMENT && terraform output -raw website_url)"
+      - echo "Build complete!"
+      - echo "S3 Bucket for deployment: $(cat ../bucket-name.txt)"
+      - echo "CloudFront Distribution ID: $(cat ../cloudfront-id.txt)"
+      - cp ../bucket-name.txt ../frontend/dist/
+      - cp ../cloudfront-id.txt ../frontend/dist/
 
 artifacts:
   files:
     - frontend/dist/**/*
+    - bucket-name.txt
+    - cloudfront-id.txt
   base-directory: '.'
   discard-paths: no
 
