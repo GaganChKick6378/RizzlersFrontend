@@ -1,7 +1,15 @@
 name: "Initial Infrastructure Setup"
 
 on:
-  # Only manual trigger for infrastructure setup
+  # Trigger on push to dev branch for terraform changes
+  push:
+    branches:
+      - dev
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+  
+  # Manual trigger for infrastructure setup
   workflow_dispatch:
     inputs:
       environment:
@@ -24,7 +32,7 @@ jobs:
   terraform:
     name: "Setup AWS Infrastructure"
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment }}
+    environment: ${{ github.event.inputs.environment || 'dev' }}
     
     steps:
       - name: Checkout
@@ -41,22 +49,31 @@ jobs:
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      - name: Get Environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          else
+            echo "ENVIRONMENT=dev" >> $GITHUB_OUTPUT
+          fi
+
       - name: Terraform Init
         working-directory: terraform/frontend
         run: |
           terraform init
-          terraform workspace select ${{ github.event.inputs.environment }} || terraform workspace new ${{ github.event.inputs.environment }}
+          terraform workspace select ${{ steps.env.outputs.ENVIRONMENT }} || terraform workspace new ${{ steps.env.outputs.ENVIRONMENT }}
 
       - name: Terraform Plan
         working-directory: terraform/frontend
         run: |
           terraform plan \
-            -var="environment=${{ github.event.inputs.environment }}" \
+            -var="environment=${{ steps.env.outputs.ENVIRONMENT }}" \
             -var="frontend_bucket_name=rizzlers-frontend" \
             -out=tfplan
 
       - name: Manual Approval for QA
-        if: github.event.inputs.environment == 'qa'
+        if: steps.env.outputs.ENVIRONMENT == 'qa'
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.token }}
