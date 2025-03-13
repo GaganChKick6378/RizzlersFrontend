@@ -379,11 +379,15 @@ jobs:
             terraform import 'data.aws_dynamodb_table.existing_locks_table[0]' rizzlers-terraform-locks || true
           fi
           
-          # Import S3 bucket if it exists
+          # Check if S3 bucket exists before trying to import
           BUCKET_NAME="rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
-          if ! terraform state list | grep -q "module.frontend_s3.aws_s3_bucket.frontend"; then
-            echo "Attempting to import S3 bucket..."
-            terraform import 'module.frontend_s3.data.aws_s3_bucket.existing_bucket[0]' $BUCKET_NAME || true
+          if aws s3api head-bucket --bucket $BUCKET_NAME 2>/dev/null; then
+            echo "S3 bucket $BUCKET_NAME exists, attempting to import..."
+            if ! terraform state list | grep -q "module.frontend_s3.aws_s3_bucket.frontend"; then
+              terraform import 'module.frontend_s3.aws_s3_bucket.frontend' $BUCKET_NAME || true
+            fi
+          else
+            echo "S3 bucket $BUCKET_NAME does not exist yet, will be created by Terraform."
           fi
         continue-on-error: true
 
