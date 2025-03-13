@@ -1,92 +1,87 @@
-# Rizzlers Frontend CI/CD Workflow
+# Rizzlers Frontend
 
-This repository contains the infrastructure as code (Terraform) and CI/CD workflows for deploying the Rizzlers Frontend application to AWS S3 and CloudFront.
+Frontend application for Rizzlers IBE project. This repository includes CI/CD workflows for automated deployments to development and QA environments.
 
-## Architecture Overview
+## CI/CD Setup
 
-The frontend application is deployed with the following architecture:
-- **S3 Bucket**: Hosts the static website files (React application)
-- **CloudFront Distribution**: Serves the content with low latency globally
-- **GitHub Actions**: Automates the deployment process
+This project uses GitHub Actions for continuous integration and deployment. We have separate workflows for different environments:
 
-## CI/CD Workflow
+### Dev Environment Workflow
 
-The GitHub Actions workflow automates the entire deployment process:
+- **Workflow File**: `.github/workflows/terraform-deploy.yml`
+- **Trigger**: Automatically runs on pushes or pull requests to the `dev` branch
+- **Process**:
+  1. Sets up Terraform and creates necessary AWS resources (S3 bucket, CloudFront distribution)
+  2. Builds the React frontend application
+  3. Deploys the built assets to the S3 bucket
+  4. Invalidates the CloudFront cache
 
-1. When code is pushed to the `dev` or `QA` branch, the workflow is triggered
-2. Terraform creates/updates the necessary AWS infrastructure:
-   - S3 bucket for hosting the static files
-   - CloudFront distribution for content delivery
-3. The React application is built
-4. The built files are uploaded to the S3 bucket
-5. CloudFront cache is invalidated to ensure the latest content is served
+### QA Environment Workflow
 
-### Branch-Based Deployments
+- **Workflow File**: `.github/workflows/terraform-deploy-qa.yml`
+- **Trigger**: Runs on pushes or pull requests to the `QA` branch
+- **Process**:
+  1. Plans the Terraform changes without applying them
+  2. Sends an email notification to reviewers
+  3. Requires manual approval before proceeding
+  4. After approval, applies the Terraform changes
+  5. Builds and deploys the frontend to the QA environment
+  6. Sends a success notification email
 
-- **dev branch**: Deploys to the development environment
-- **QA branch**: Deploys to the QA environment
+## Environment Separation
 
-## Infrastructure as Code (Terraform)
+The project uses Terraform workspaces to maintain separate infrastructure for each environment:
 
-The Terraform configurations are organized in a modular way:
+- **Dev Environment**: Uses the `dev` workspace
+- **QA Environment**: Uses the `qa` workspace
 
-```
-terraform/
-├── main.tf
-├── modules/
-    ├── frontend/
-        ├── s3/
-        │   └── main.tf
-        └── cloudfront/
-            ├── main.tf
-            └── variables.tf
-```
+Resources are named with the environment suffix to ensure proper separation, e.g.:
+- S3 buckets: `rizzlers-ibe-frontend-dev` and `rizzlers-ibe-frontend-qa`
+- CloudFront distributions: Named with corresponding environment tags
 
-### State Management
+## Required GitHub Secrets
 
-Terraform state is stored in an S3 bucket:
-- Bucket: `rizzlers-ibe-dev-tfstate`
-- Key: `frontend/terraform.tfstate`
+The following secrets need to be configured in your GitHub repository:
 
-## Tagging Strategy
+- `AWS_ACCESS_KEY_ID`: AWS access key with permissions to create/modify S3 and CloudFront resources
+- `AWS_SECRET_ACCESS_KEY`: Corresponding AWS secret key
+- `MAIL_SERVER`: SMTP server address for sending email notifications
+- `MAIL_PORT`: SMTP server port
+- `MAIL_USERNAME`: Email account username
+- `MAIL_PASSWORD`: Email account password
+- `REVIEWER_EMAIL`: Email address for QA deployment reviewers
+- `TEAM_EMAIL`: Email address for the team to receive deployment notifications
 
-All resources are tagged with:
-- **Name**: Rizzlers-[resource-name]
-- **Creator**: RizzlersTeam
-- **Purpose**: IBE
+## GitHub Environment Configuration
 
-## Frontend Application
+To enable the manual approval process for QA deployments:
 
-The frontend application is a React application built with:
-- React
-- TypeScript
-- Vite
-
-## Accessing the Application
-
-After deployment, the application is available at:
-- Development: https://[cloudfront-domain-dev]
-- QA: https://[cloudfront-domain-qa]
-
-## Setup Requirements
-
-To use this workflow, you need to set up the following GitHub secrets:
-- `AWS_ROLE_ARN`: The ARN of an AWS IAM role with permissions to:
-  - Create/update S3 buckets
-  - Create/update CloudFront distributions
-  - Read/write to the S3 state bucket
+1. Go to your repository Settings > Environments
+2. Create a new environment named `qa`
+3. Enable "Required reviewers" and add the appropriate team members
+4. (Optional) Set deployment branch policies to limit to the `QA` branch
 
 ## Local Development
 
-For local development:
+To run the frontend locally:
 
-1. Install dependencies:
 ```bash
 cd frontend
 npm install
-```
-
-2. Start the development server:
-```bash
 npm run dev
 ```
+
+## Deployment Workflow
+
+### Development (Automatic)
+1. Push changes to the `dev` branch
+2. GitHub Actions automatically deploys to the development environment
+3. Access the site at the CloudFront URL in the workflow output
+
+### QA (Manual Approval)
+1. Push changes to the `QA` branch
+2. GitHub Actions runs the planning phase
+3. Reviewers receive an email notification
+4. Reviewers approve the deployment in GitHub
+5. The application deploys to the QA environment
+6. Team receives a deployment success notification

@@ -7,7 +7,6 @@ on:
   pull_request:
     branches:
       - dev
-    types: [closed]
 
 jobs:
   terraform:
@@ -19,6 +18,9 @@ jobs:
     defaults:
       run:
         working-directory: terraform
+    
+    outputs:
+      environment: ${{ steps.workspace.outputs.WORKSPACE }}
 
     steps:
       - name: Checkout Repository
@@ -349,11 +351,12 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      # Set workspace to dev for development branch
+      # Set workspace to dev for dev branch
       - name: Set Terraform Workspace
         id: workspace
         run: |
           echo "WORKSPACE=dev" >> $GITHUB_ENV
+          echo "WORKSPACE=dev" >> $GITHUB_OUTPUT
 
       - name: Terraform Init
         run: terraform init
@@ -382,11 +385,7 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Terraform Plan
-        run: terraform plan -input=false
-
       - name: Terraform Apply
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: terraform apply -auto-approve -input=false
         continue-on-error: true
         
@@ -398,7 +397,6 @@ jobs:
         
       - name: Get CloudFront Domain
         id: cloudfront_domain
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: |
           # Try to get the CloudFront domain if available, but don't fail if it's not
           CF_DOMAIN=$(terraform output cloudfront_distribution_domain || echo "")
@@ -416,8 +414,6 @@ jobs:
     name: "Build and Deploy Frontend - Dev"
     needs: terraform
     runs-on: ubuntu-latest
-    env:
-      WORKSPACE: dev
     
     defaults:
       run:
@@ -440,7 +436,7 @@ jobs:
       - name: Build Frontend
         run: npm run build
         env:
-          VITE_APP_ENV: ${{ env.WORKSPACE }}
+          VITE_APP_ENV: ${{ needs.terraform.outputs.environment }}
           
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -452,11 +448,7 @@ jobs:
       - name: Deploy to S3
         run: |
           # Use the S3 bucket name from terraform job
-          S3_BUCKET="${{ env.S3_BUCKET }}"
-          if [ -z "$S3_BUCKET" ]; then
-            # Default fallback
-            S3_BUCKET="rizzlers-ibe-frontend-dev"
-          fi
+          S3_BUCKET="rizzlers-ibe-frontend-dev"
           
           echo "Deploying to S3 bucket: $S3_BUCKET"
           aws s3 sync ./dist/ s3://$S3_BUCKET/ --delete
@@ -464,10 +456,7 @@ jobs:
       - name: Invalidate CloudFront Cache
         run: |
           # Get the S3 bucket name
-          S3_BUCKET="${{ env.S3_BUCKET }}"
-          if [ -z "$S3_BUCKET" ]; then
-            S3_BUCKET="rizzlers-ibe-frontend-dev"
-          fi
+          S3_BUCKET="rizzlers-ibe-frontend-dev"
           
           # Find CloudFront distribution directly from AWS API
           DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[].DomainName, '$S3_BUCKET')].Id" --output text)
@@ -485,8 +474,8 @@ jobs:
 
       - name: Deployment Info
         run: |
-          echo "Frontend deployed to Dev environment:"
-          echo "S3 Bucket: ${{ env.S3_BUCKET }}"
+          echo "Frontend deployed to dev environment:"
+          echo "S3 Bucket: rizzlers-ibe-frontend-dev"
           if [ -n "${{ env.CLOUDFRONT_DOMAIN }}" ]; then
             echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}"
           else
