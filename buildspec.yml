@@ -223,7 +223,6 @@ phases:
         fi
       - ls -la dist/  # List files in dist directory
       - # Upload to S3 regardless of build path
-      - echo "Uploading from dist directory to S3 bucket: $S3_BUCKET_NAME"
       - aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete
       - # Invalidate CloudFront cache if we have a distribution ID
       - |
