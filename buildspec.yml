@@ -43,13 +43,58 @@ phases:
           region = "ap-south-1"
         }
 
-        # Just use local variables instead of trying to modify the S3 bucket directly
-        locals {
-          bucket_name = "rizzlers-frontend-dev"
-          website_endpoint = "${local.bucket_name}.s3-website-ap-south-1.amazonaws.com"
+        # S3 bucket configuration
+        resource "aws_s3_bucket" "frontend_bucket" {
+          bucket = "rizzlers-frontend-dev"
+          tags = {
+            Name = "Rizzlers Frontend Bucket"
+            Environment = "dev"
+          }
         }
 
-        # Configure CloudFront without S3 bucket modifications
+        # S3 bucket website configuration
+        resource "aws_s3_bucket_website_configuration" "frontend_website" {
+          bucket = aws_s3_bucket.frontend_bucket.id
+          index_document {
+            suffix = "index.html"
+          }
+          error_document {
+            key = "index.html"
+          }
+        }
+
+        # S3 bucket public access block
+        resource "aws_s3_bucket_public_access_block" "frontend_public_access" {
+          bucket = aws_s3_bucket.frontend_bucket.id
+          block_public_acls       = false
+          block_public_policy     = false
+          ignore_public_acls      = false
+          restrict_public_buckets = false
+        }
+
+        # S3 bucket policy for public access
+        resource "aws_s3_bucket_policy" "frontend_policy" {
+          bucket = aws_s3_bucket.frontend_bucket.id
+          policy = jsonencode({
+            Version = "2012-10-17"
+            Statement = [
+              {
+                Sid = "PublicReadGetObject"
+                Effect = "Allow"
+                Principal = "*"
+                Action = [
+                  "s3:GetObject"
+                ]
+                Resource = [
+                  "${aws_s3_bucket.frontend_bucket.arn}/*"
+                ]
+              }
+            ]
+          })
+          depends_on = [aws_s3_bucket_public_access_block.frontend_public_access]
+        }
+
+        # CloudFront distribution
         resource "aws_cloudfront_distribution" "frontend" {
           enabled             = true
           is_ipv6_enabled     = true
@@ -59,8 +104,8 @@ phases:
           wait_for_deployment = false
 
           origin {
-            domain_name = local.website_endpoint
-            origin_id   = "S3-${local.bucket_name}"
+            domain_name = aws_s3_bucket_website_configuration.frontend_website.website_endpoint
+            origin_id   = "S3-${aws_s3_bucket.frontend_bucket.id}"
 
             custom_origin_config {
               http_port              = 80
@@ -73,7 +118,7 @@ phases:
           default_cache_behavior {
             allowed_methods  = ["GET", "HEAD", "OPTIONS"]
             cached_methods   = ["GET", "HEAD"]
-            target_origin_id = "S3-${local.bucket_name}"
+            target_origin_id = "S3-${aws_s3_bucket.frontend_bucket.id}"
             forwarded_values {
               query_string = false
               cookies {
@@ -116,7 +161,7 @@ phases:
         }
 
         output "s3_bucket_name" {
-          value = local.bucket_name
+          value = aws_s3_bucket.frontend_bucket.id
         }
 
         output "cloudfront_distribution_id" {
@@ -128,7 +173,7 @@ phases:
         }
 
         output "s3_website_endpoint" {
-          value = local.website_endpoint
+          value = aws_s3_bucket_website_configuration.frontend_website.website_endpoint
         }
         EOF
       - cd terraform/environments/$ENVIRONMENT
@@ -144,32 +189,35 @@ phases:
       - pwd  # Print working directory
       - ls -la  # List files
       - echo "Building the React application"
-      - if [ -d "frontend" ]; then
-      -   cd frontend
-      -   npm install
-      -   npm run build
-      -   cd ..
-      - else
-      -   # If no frontend directory exists, create a simple build output
-      -   mkdir -p dist
-      -   echo '<html><body><h1>Rizzlers Frontend</h1><p>Placeholder page</p></body></html>' > dist/index.html
-      - fi
+      - |
+        if [ -d "frontend" ]; then
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+        else
+          # If no frontend directory exists, create a simple build output
+          mkdir -p dist
+          echo '<html><body><h1>Rizzlers Frontend</h1><p>Placeholder page</p></body></html>' > dist/index.html
+        fi
       - ls -la  # List files again
       - # Upload to S3 regardless of build path
-      - if [ -d "frontend/dist" ]; then
-      -   aws s3 sync frontend/dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
-      - elif [ -d "dist" ]; then
-      -   aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
-      - else
-      -   echo "No dist directory found, creating one..."
-      -   mkdir -p dist
-      -   echo '<html><body><h1>Rizzlers Frontend</h1><p>Build artifact not found</p></body></html>' > dist/index.html
-      -   aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
-      - fi
+      - |
+        if [ -d "frontend/dist" ]; then
+          aws s3 sync frontend/dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
+        elif [ -d "dist" ]; then
+          aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
+        else
+          echo "No dist directory found, creating one..."
+          mkdir -p dist
+          echo '<html><body><h1>Rizzlers Frontend</h1><p>Build artifact not found</p></body></html>' > dist/index.html
+          aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
+        fi
       - # Invalidate CloudFront cache if we have a distribution ID
-      - if [ ! -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then 
-      -   aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*" || echo "CloudFront invalidation failed"
-      - fi
+      - |
+        if [ ! -z "$CLOUDFRONT_DISTRIBUTION_ID" ]; then 
+          aws cloudfront create-invalidation --distribution-id $CLOUDFRONT_DISTRIBUTION_ID --paths "/*" || echo "CloudFront invalidation failed"
+        fi
 
   post_build:
     commands:
@@ -177,10 +225,11 @@ phases:
       - echo "=============================================================="
       - echo "=============================================================="
       - # Ensure dist artifacts exist for the artifact upload phase
-      - if [ ! -d "dist" ] && [ ! -d "frontend/dist" ]; then
-      -   mkdir -p dist
-      -   echo "Placeholder content" > dist/index.html
-      - fi
+      - |
+        if [ ! -d "dist" ] && [ ! -d "frontend/dist" ]; then
+          mkdir -p dist
+          echo "Placeholder content" > dist/index.html
+        fi
       - # Copy buildspec.yml to ensure at least one artifact exists
       - cp buildspec.yml $([ -d "frontend/dist" ] && echo "frontend/dist/" || echo "dist/")
 
