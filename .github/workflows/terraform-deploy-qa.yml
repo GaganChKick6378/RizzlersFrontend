@@ -391,7 +391,7 @@ jobs:
           terraform show -no-color tfplan > tfplan.txt
       
       - name: Save Plan as Artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: terraform-plan
           path: terraform/tfplan.txt
@@ -436,7 +436,7 @@ jobs:
     
     steps:
       - name: Download Plan
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: terraform-plan
           path: .
