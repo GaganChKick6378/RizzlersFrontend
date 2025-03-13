@@ -197,9 +197,6 @@ phases:
       - export S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name 2>/dev/null || echo "rizzlers-frontend-dev")
       - export CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id 2>/dev/null || echo "")
       - export CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name 2>/dev/null || echo "")
-      - echo "CloudFront Distribution ID: $CLOUDFRONT_DISTRIBUTION_ID"
-      - echo "CloudFront Domain Name: $CLOUDFRONT_DOMAIN_NAME"
-      - echo "S3 Website Endpoint: $(terraform output -raw s3_website_endpoint)"
       - echo "Listing CloudFront distributions:"
       - aws cloudfront list-distributions --query 'DistributionList.Items[*].{Id:Id,DomainName:DomainName,Comment:Comment}' --output table
       - cd ../../..  # Back to root
