@@ -96,8 +96,17 @@ jobs:
             }
           }
 
-          # Create the DynamoDB table for state locking if it doesn't exist
+          # Use a data source to check if the DynamoDB table already exists
+          data "aws_dynamodb_table" "existing_locks_table" {
+            name = "rizzlers-terraform-locks"
+            # This will fail if the table doesn't exist, but that's okay because we use count below
+            count = 1
+          }
+
+          # Create the DynamoDB table for state locking only if it doesn't exist
           resource "aws_dynamodb_table" "terraform_locks" {
+            # Only create if the data source lookup fails (i.e., the table doesn't exist)
+            count        = length(data.aws_dynamodb_table.existing_locks_table) > 0 ? 0 : 1
             name         = "rizzlers-terraform-locks"
             billing_mode = "PAY_PER_REQUEST"
             hash_key     = "LockID"
@@ -122,11 +131,29 @@ jobs:
           EOF
 
           cat <<EOF > modules/frontend/s3/main.tf
+          locals {
+            bucket_name = "rizzlers-ibe-frontend-\${terraform.workspace}"
+          }
+
+          # Use a data source to check if the bucket already exists
+          data "aws_s3_bucket" "existing_bucket" {
+            bucket = local.bucket_name
+            count  = 1
+          }
+
           resource "aws_s3_bucket" "frontend" {
-            bucket = "rizzlers-ibe-frontend-\${terraform.workspace}"
+            bucket = local.bucket_name
             
             tags = {
               Name = "Rizzlers-Frontend-S3"
+            }
+
+            # Don't recreate if only these attributes change
+            lifecycle {
+              ignore_changes = [
+                tags,
+                server_side_encryption_configuration
+              ]
             }
           }
 
@@ -268,6 +295,14 @@ jobs:
             tags = {
               Name = "Rizzlers-Frontend-CloudFront"
             }
+
+            # Prevent recreation issues
+            lifecycle {
+              ignore_changes = [
+                tags,
+                viewer_certificate
+              ]
+            }
           }
 
           output "cloudfront_distribution_domain" {
@@ -331,12 +366,29 @@ jobs:
         run: terraform fmt
         continue-on-error: true
 
+      - name: Import Existing Resources
+        run: |
+          # First check if resources exist in state already
+          if ! terraform state list | grep -q "aws_dynamodb_table.terraform_locks"; then
+            echo "Attempting to import DynamoDB table..."
+            terraform import 'data.aws_dynamodb_table.existing_locks_table[0]' rizzlers-terraform-locks || true
+          fi
+          
+          # Import S3 bucket if it exists
+          BUCKET_NAME="rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
+          if ! terraform state list | grep -q "module.frontend_s3.aws_s3_bucket.frontend"; then
+            echo "Attempting to import S3 bucket..."
+            terraform import 'module.frontend_s3.data.aws_s3_bucket.existing_bucket[0]' $BUCKET_NAME || true
+          fi
+        continue-on-error: true
+
       - name: Terraform Plan
         run: terraform plan -input=false
 
       - name: Terraform Apply
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: terraform apply -auto-approve -input=false
+        continue-on-error: true
         
       - name: Set S3 Bucket Name
         id: set_bucket

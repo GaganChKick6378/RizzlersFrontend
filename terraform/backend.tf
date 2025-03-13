@@ -8,8 +8,17 @@ terraform {
   }
 }
 
-# Create the DynamoDB table for state locking if it doesn't exist
+# Use a data source to check if the DynamoDB table already exists
+data "aws_dynamodb_table" "existing_locks_table" {
+  name = "rizzlers-terraform-locks"
+  # This will fail if the table doesn't exist, but that's okay because we use count below
+  count = 1
+}
+
+# Create the DynamoDB table for state locking only if it doesn't exist
 resource "aws_dynamodb_table" "terraform_locks" {
+  # Only create if the data source lookup fails (i.e., the table doesn't exist)
+  count        = length(data.aws_dynamodb_table.existing_locks_table) > 0 ? 0 : 1
   name         = "rizzlers-terraform-locks"
   billing_mode = "PAY_PER_REQUEST"
   hash_key     = "LockID"

@@ -1,8 +1,26 @@
+locals {
+  bucket_name = "rizzlers-ibe-frontend-${terraform.workspace}"
+}
+
+# Use a data source to check if the bucket already exists
+data "aws_s3_bucket" "existing_bucket" {
+  bucket = local.bucket_name
+  count  = 1
+}
+
 resource "aws_s3_bucket" "frontend" {
-  bucket = "rizzlers-ibe-frontend-${terraform.workspace}"
+  bucket = local.bucket_name
   
   tags = {
     Name = "Rizzlers-Frontend-S3"
+  }
+
+  # Don't recreate if only these attributes change
+  lifecycle {
+    ignore_changes = [
+      tags,
+      server_side_encryption_configuration
+    ]
   }
 }
 
@@ -45,7 +63,7 @@ resource "aws_s3_bucket_website_configuration" "frontend" {
 }
 
 resource "aws_s3_bucket_policy" "frontend" {
-  bucket = aws_s3_bucket.frontend.id
+  bucket     = aws_s3_bucket.frontend.id
   depends_on = [aws_s3_bucket_public_access_block.frontend]
   
   policy = jsonencode({
@@ -62,13 +80,16 @@ resource "aws_s3_bucket_policy" "frontend" {
 }
 
 output "bucket_name" {
-  value = aws_s3_bucket.frontend.id
+  description = "The name of the S3 bucket"
+  value       = aws_s3_bucket.frontend.id
 }
 
 output "bucket_regional_domain_name" {
-  value = aws_s3_bucket.frontend.bucket_regional_domain_name
+  description = "The regional domain name of the S3 bucket"
+  value       = aws_s3_bucket.frontend.bucket_regional_domain_name
 }
 
 output "website_endpoint" {
-  value = aws_s3_bucket_website_configuration.frontend.website_endpoint
+  description = "The website endpoint of the S3 bucket"
+  value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
 } 
