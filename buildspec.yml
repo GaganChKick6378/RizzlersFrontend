@@ -175,11 +175,6 @@ phases:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
-      - if [ ! -z "$CLOUDFRONT_DOMAIN_NAME" ]; then 
-      -   echo "Website URL: https://$CLOUDFRONT_DOMAIN_NAME"
-      - else
-      -   echo "Website URL: http://$S3_BUCKET_NAME.s3-website-ap-south-1.amazonaws.com"
-      - fi
       - echo "=============================================================="
       - # Ensure dist artifacts exist for the artifact upload phase
       - if [ ! -d "dist" ] && [ ! -d "frontend/dist" ]; then
