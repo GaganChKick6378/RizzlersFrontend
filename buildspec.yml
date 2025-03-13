@@ -242,7 +242,6 @@ phases:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
-      - echo "APPLICATION URL: https://$CLOUDFRONT_DOMAIN_NAME"
       - echo "=============================================================="
       - |
         # Ensure dist directory exists and has content
