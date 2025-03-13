@@ -1,41 +1,39 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+  
+  backend "s3" {
+    bucket = "rizzlers-ibe-dev-tfstate"
+    key    = "frontend/terraform.tfstate"
+    region = "us-east-1"
+  }
+}
+
 provider "aws" {
-  region = "ap-south-1"
+  region = "us-east-1"
+  default_tags {
+    tags = {
+      Creator = "RizzlersTeam"
+      Purpose = "IBE"
+    }
+  }
 }
 
-# Use environment variable or set a default
-variable "environment" {
-  description = "Environment (dev or qa)"
-  type        = string
-  default     = "dev"
+module "frontend_s3" {
+  source = "./modules/frontend/s3"
 }
 
-# Include the appropriate environment configuration
-module "environment_config" {
-  source = "./environments/${var.environment}"
+module "frontend_cloudfront" {
+  source = "./modules/frontend/cloudfront"
+  bucket_name = module.frontend_s3.bucket_name
+  bucket_regional_domain_name = module.frontend_s3.bucket_regional_domain_name
+  depends_on = [module.frontend_s3]
 }
 
-# Output all the outputs from the environment module
-output "website_url" {
-  value       = module.environment_config.website_url
-  description = "The CloudFront URL of the website"
-}
-
-output "frontend_s3_bucket_name" {
-  value       = module.environment_config.s3_bucket_name
-  description = "The name of the S3 bucket hosting the website content"
-}
-
-output "frontend_cloudfront_distribution_id" {
-  value       = module.environment_config.cloudfront_distribution_id
-  description = "The ID of the CloudFront distribution"
-}
-
-output "terraform_state_bucket_name" {
-  value       = module.environment_config.state_bucket_name
-  description = "The name of the S3 bucket for terraform state"
-}
-
-output "terraform_locks_table_name" {
-  value       = module.environment_config.terraform_locks_table
-  description = "The name of the DynamoDB table for terraform locks"
+output "cloudfront_distribution_domain" {
+  value = module.frontend_cloudfront.cloudfront_distribution_domain
 } 

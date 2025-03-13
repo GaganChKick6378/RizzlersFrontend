@@ -1,140 +1,182 @@
-name: Terraform Deploy Frontend
+name: Terraform and Frontend Deployment
 
 on:
   push:
     branches:
-      - dev  # Trigger on direct pushes to dev branch
+      - dev
+      - QA
   pull_request:
-    types: [closed]
     branches:
-      - dev  # Trigger when PRs are merged into dev branch
-  workflow_dispatch:  # Allow manual triggers
-
-env:
-  TERRAFORM_VERSION: 1.5.7
-  NODE_VERSION: 18
-  DEFAULT_ENVIRONMENT: dev
-  TERRAFORM_STATE_BUCKET: rizzlers-ibe-dev-tfstate
-  TERRAFORM_STATE_KEY: frontend/terraform.tfstate
-  TERRAFORM_STATE_REGION: ap-south-1
+      - dev
+      - QA
+    types: [closed]
 
 jobs:
-  terraform-deploy:
+  terraform:
+    name: "Terraform"
     runs-on: ubuntu-latest
-    # Only run this job when push event or PR is merged (not when PR is just closed without merging)
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    permissions:
+      id-token: write
+      contents: read
     
+    defaults:
+      run:
+        working-directory: terraform
+
     steps:
-      - name: Checkout repository
+      - name: Checkout Repository
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: ${{ env.TERRAFORM_VERSION }}
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.TERRAFORM_STATE_REGION }}
-          mask-aws-account-id: true
-
-      - name: Create S3 State Bucket
+      # Create terraform directory and modules structure if it doesn't exist
+      - name: Setup Terraform Directory
         run: |
-          aws s3api create-bucket \
-            --bucket ${{ env.TERRAFORM_STATE_BUCKET }} \
-            --region ${{ env.TERRAFORM_STATE_REGION }} \
-            --create-bucket-configuration LocationConstraint=${{ env.TERRAFORM_STATE_REGION }} || true
+          mkdir -p modules/frontend/s3
+          mkdir -p modules/frontend/cloudfront
+        working-directory: .
 
-      - name: Create Terraform Configuration
+      # Create terraform configuration files for frontend resources
+      - name: Create Terraform Configuration Files
         run: |
-          mkdir -p terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}
-          cat > terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}/main.tf << 'EOF'
+          cat <<EOF > main.tf
           terraform {
+            required_providers {
+              aws = {
+                source  = "hashicorp/aws"
+                version = "~> 5.0"
+              }
+            }
+            
             backend "s3" {
               bucket = "rizzlers-ibe-dev-tfstate"
               key    = "frontend/terraform.tfstate"
-              region = "ap-south-1"
+              region = "us-east-1"
             }
           }
 
           provider "aws" {
-            region = "ap-south-1"
+            region = "us-east-1"
+            default_tags {
+              tags = {
+                Creator = "RizzlersTeam"
+                Purpose = "IBE"
+              }
+            }
           }
 
-          # S3 bucket configuration
-          resource "aws_s3_bucket" "frontend_bucket" {
-            bucket = "rizzlers-frontend-dev"
+          module "frontend_s3" {
+            source = "./modules/frontend/s3"
+          }
+
+          module "frontend_cloudfront" {
+            source = "./modules/frontend/cloudfront"
+            bucket_name = module.frontend_s3.bucket_name
+            bucket_regional_domain_name = module.frontend_s3.bucket_regional_domain_name
+            depends_on = [module.frontend_s3]
+          }
+
+          output "cloudfront_distribution_domain" {
+            value = module.frontend_cloudfront.cloudfront_distribution_domain
+          }
+          EOF
+
+          cat <<EOF > modules/frontend/s3/main.tf
+          resource "aws_s3_bucket" "frontend" {
+            bucket = "rizzlers-ibe-frontend-\${terraform.workspace}"
+            
             tags = {
-              Name = "Rizzlers Frontend Bucket"
-              Environment = "dev"
+              Name = "Rizzlers-Frontend-S3"
             }
           }
 
-          # S3 bucket website configuration
-          resource "aws_s3_bucket_website_configuration" "frontend_website" {
-            bucket = aws_s3_bucket.frontend_bucket.id
-            index_document {
-              suffix = "index.html"
-            }
-            error_document {
-              key = "index.html"
+          resource "aws_s3_bucket_ownership_controls" "frontend" {
+            bucket = aws_s3_bucket.frontend.id
+            rule {
+              object_ownership = "BucketOwnerPreferred"
             }
           }
 
-          # S3 bucket public access block
-          resource "aws_s3_bucket_public_access_block" "frontend_public_access" {
-            bucket = aws_s3_bucket.frontend_bucket.id
+          resource "aws_s3_bucket_public_access_block" "frontend" {
+            bucket = aws_s3_bucket.frontend.id
+          
             block_public_acls       = false
             block_public_policy     = false
             ignore_public_acls      = false
             restrict_public_buckets = false
           }
 
-          # S3 bucket policy for public access
-          resource "aws_s3_bucket_policy" "frontend_policy" {
-            bucket = aws_s3_bucket.frontend_bucket.id
+          resource "aws_s3_bucket_acl" "frontend" {
+            depends_on = [
+              aws_s3_bucket_ownership_controls.frontend,
+              aws_s3_bucket_public_access_block.frontend,
+            ]
+
+            bucket = aws_s3_bucket.frontend.id
+            acl    = "public-read"
+          }
+
+          resource "aws_s3_bucket_website_configuration" "frontend" {
+            bucket = aws_s3_bucket.frontend.id
+            
+            index_document {
+              suffix = "index.html"
+            }
+            
+            error_document {
+              key = "index.html"
+            }
+          }
+
+          resource "aws_s3_bucket_policy" "frontend" {
+            bucket = aws_s3_bucket.frontend.id
+            depends_on = [aws_s3_bucket_public_access_block.frontend]
+            
             policy = jsonencode({
               Version = "2012-10-17"
               Statement = [
                 {
-                  Sid = "PublicReadGetObject"
-                  Effect = "Allow"
+                  Effect    = "Allow"
                   Principal = "*"
-                  Action = [
-                    "s3:GetObject"
-                  ]
-                  Resource = [
-                    "${aws_s3_bucket.frontend_bucket.arn}/*"
-                  ]
+                  Action    = "s3:GetObject"
+                  Resource  = "\${aws_s3_bucket.frontend.arn}/*"
                 }
               ]
             })
-            depends_on = [aws_s3_bucket_public_access_block.frontend_public_access]
           }
 
-          # CloudFront distribution
+          output "bucket_name" {
+            value = aws_s3_bucket.frontend.id
+          }
+
+          output "bucket_regional_domain_name" {
+            value = aws_s3_bucket.frontend.bucket_regional_domain_name
+          }
+
+          output "website_endpoint" {
+            value = aws_s3_bucket_website_configuration.frontend.website_endpoint
+          }
+          EOF
+
+          cat <<EOF > modules/frontend/cloudfront/main.tf
+          resource "aws_cloudfront_origin_access_identity" "frontend" {
+            comment = "OAI for Rizzlers Frontend"
+          }
+
           resource "aws_cloudfront_distribution" "frontend" {
             enabled             = true
             is_ipv6_enabled     = true
             default_root_object = "index.html"
-            comment             = "Rizzlers Frontend Distribution"
-            price_class         = "PriceClass_200"
-            wait_for_deployment = false
-
+            price_class         = "PriceClass_100"
+            
             origin {
-              domain_name = aws_s3_bucket_website_configuration.frontend_website.website_endpoint
-              origin_id   = "S3-${aws_s3_bucket.frontend_bucket.id}"
-
+              domain_name = var.bucket_regional_domain_name
+              origin_id   = "S3-rizzlers-frontend"
+              
               custom_origin_config {
                 http_port              = 80
                 https_port             = 443
@@ -142,167 +184,157 @@ jobs:
                 origin_ssl_protocols   = ["TLSv1.2"]
               }
             }
-
+            
             default_cache_behavior {
               allowed_methods  = ["GET", "HEAD", "OPTIONS"]
               cached_methods   = ["GET", "HEAD"]
-              target_origin_id = "S3-${aws_s3_bucket.frontend_bucket.id}"
+              target_origin_id = "S3-rizzlers-frontend"
+              
               forwarded_values {
                 query_string = false
+                
                 cookies {
                   forward = "none"
                 }
               }
+              
               viewer_protocol_policy = "redirect-to-https"
               min_ttl                = 0
               default_ttl            = 3600
               max_ttl                = 86400
             }
-
-            custom_error_response {
-              error_code         = 403
-              response_code      = 200
-              response_page_path = "/index.html"
-            }
-
-            custom_error_response {
-              error_code         = 404
-              response_code      = 200
-              response_page_path = "/index.html"
-            }
-
+            
             restrictions {
               geo_restriction {
                 restriction_type = "none"
               }
             }
-
+            
             viewer_certificate {
               cloudfront_default_certificate = true
             }
-
+            
+            custom_error_response {
+              error_code         = 403
+              response_code      = 200
+              response_page_path = "/index.html"
+            }
+            
+            custom_error_response {
+              error_code         = 404
+              response_code      = 200
+              response_page_path = "/index.html"
+            }
+            
             tags = {
-              Name = "Rizzlers-dev-cloudfront"
-              Creator = "Rizzlers Team"
-              Purpose = "IBE"
+              Name = "Rizzlers-Frontend-CloudFront"
             }
           }
 
-          # Outputs
-          output "s3_bucket_name" {
-            value = aws_s3_bucket.frontend_bucket.id
-          }
-
-          output "cloudfront_distribution_id" {
-            value = aws_cloudfront_distribution.frontend.id
-          }
-
-          output "cloudfront_domain_name" {
+          output "cloudfront_distribution_domain" {
             value = aws_cloudfront_distribution.frontend.domain_name
           }
+          EOF
 
-          output "s3_website_endpoint" {
-            value = aws_s3_bucket_website_configuration.frontend_website.website_endpoint
+          cat <<EOF > modules/frontend/cloudfront/variables.tf
+          variable "bucket_name" {
+            description = "Name of the S3 bucket"
+            type        = string
+          }
+
+          variable "bucket_regional_domain_name" {
+            description = "Regional domain name of the S3 bucket"
+            type        = string
           }
           EOF
-          
-          # Replace placeholders with environment variables
-          sed -i "s/rizzlers-ibe-dev-tfstate/${{ env.TERRAFORM_STATE_BUCKET }}/g" terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}/main.tf
-          sed -i "s!frontend/terraform.tfstate!${{ env.TERRAFORM_STATE_KEY }}!g" terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}/main.tf
-          sed -i "s/ap-south-1/${{ env.TERRAFORM_STATE_REGION }}/g" terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}/main.tf
+        working-directory: terraform
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.7
+
+      # Determine the Terraform workspace based on the branch
+      - name: Set Terraform Workspace
+        id: workspace
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/QA" ]]; then
+            echo "WORKSPACE=qa" >> $GITHUB_ENV
+          else
+            echo "WORKSPACE=dev" >> $GITHUB_ENV
+          fi
 
       - name: Terraform Init
+        run: terraform init
+
+      - name: Select Workspace
         run: |
-          cd terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}
-          terraform init -reconfigure
+          terraform workspace select ${{ env.WORKSPACE }} || terraform workspace new ${{ env.WORKSPACE }}
+
+      - name: Terraform Format
+        run: terraform fmt -check
 
       - name: Terraform Plan
-        run: |
-          cd terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}
-          terraform plan -no-color
-        id: plan
+        run: terraform plan -input=false
 
       - name: Terraform Apply
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+        run: terraform apply -auto-approve -input=false
+        
+      - name: Get Terraform Outputs
+        id: terraform_outputs
+        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: |
-          cd terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}
-          terraform apply -auto-approve
-        id: terraform
+          echo "S3_BUCKET=$(terraform output -raw bucket_name)" >> $GITHUB_ENV
+          echo "CLOUDFRONT_DOMAIN=$(terraform output -raw cloudfront_distribution_domain)" >> $GITHUB_ENV
 
-      - name: Extract Terraform Outputs
-        run: |
-          cd terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}
-          echo "S3_BUCKET_NAME=$(terraform output -raw s3_bucket_name)" >> $GITHUB_ENV
-          echo "CLOUDFRONT_DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_ENV
-          echo "CLOUDFRONT_DOMAIN_NAME=$(terraform output -raw cloudfront_domain_name)" >> $GITHUB_ENV
-          echo "S3_WEBSITE_ENDPOINT=$(terraform output -raw s3_website_endpoint)" >> $GITHUB_ENV
+  build-and-deploy:
+    name: "Build and Deploy Frontend"
+    needs: terraform
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    defaults:
+      run:
+        working-directory: frontend
 
-      - name: Build React Frontend
-        run: |
-          pwd
-          ls -la
-          # Different paths based on repository structure
-          if [ -d "frontend" ]; then
-            cd frontend
-            npm install
-            npm run build
-            cd ..
-            # Determine build output directory
-            if [ -d "frontend/dist" ]; then
-              mkdir -p dist
-              cp -r frontend/dist/* dist/
-            elif [ -d "frontend/build" ]; then
-              mkdir -p dist
-              cp -r frontend/build/* dist/
-            fi
-          else
-            # Assume we're already in the frontend directory
-            npm install
-            npm run build
-            
-            # Check if dist or build is used
-            if [ -d "dist" ]; then
-              echo "Build folder is dist/"
-            elif [ -d "build" ]; then
-              mkdir -p dist
-              cp -r build/* dist/
-            else
-              echo "Creating placeholder dist directory"
-              mkdir -p dist
-              echo "<html><body><h1>Rizzlers Frontend</h1><p>Placeholder page</p></body></html>" > dist/index.html
-            fi
-          fi
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Frontend
+        run: npm run build
+        env:
+          VITE_APP_ENV: ${{ env.WORKSPACE }}
           
-          ls -la dist/ || echo "Could not list dist directory"
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: us-east-1
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
 
       - name: Deploy to S3
         run: |
-          if [ -d "dist" ]; then
-            echo "Deploying to S3 bucket: ${{ env.S3_BUCKET_NAME }}"
-            aws s3 sync dist/ s3://${{ env.S3_BUCKET_NAME }}/ --delete
-          else
-            echo "No dist directory found!"
-            exit 1
-          fi
-
+          aws s3 sync ./dist/ s3://${{ env.S3_BUCKET }}/ --delete
+        
       - name: Invalidate CloudFront Cache
         run: |
-          if [ ! -z "${{ env.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
-            echo "Invalidating CloudFront cache for distribution: ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}"
-            aws cloudfront create-invalidation --distribution-id ${{ env.CLOUDFRONT_DISTRIBUTION_ID }} --paths "/*"
-          else
-            echo "No CloudFront distribution ID found"
-          fi
+          aws cloudfront create-invalidation --distribution-id $(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[?contains(@, '${{ env.S3_BUCKET }}')]].Id" --output text) --paths "/*"
 
-      - name: Output Deployment Information
+      - name: Deployment Info
         run: |
-          echo "=============================================================="
-          echo "Deployment completed!"
-          echo "S3 Bucket: ${{ env.S3_BUCKET_NAME }}"
-          echo "CloudFront Distribution ID: ${{ env.CLOUDFRONT_DISTRIBUTION_ID }}"
-          
-          if [ ! -z "${{ env.CLOUDFRONT_DOMAIN_NAME }}" ]; then
-            echo "Website URL: https://${{ env.CLOUDFRONT_DOMAIN_NAME }}"
-          else
-            echo "Website URL: http://${{ env.S3_WEBSITE_ENDPOINT }}"
-          fi
-          echo "==============================================================" 
+          echo "Frontend deployed to:"
+          echo "S3 Bucket: ${{ env.S3_BUCKET }}"
+          echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}" 

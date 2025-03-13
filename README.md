@@ -1,103 +1,92 @@
-# Rizzlers Frontend
+# Rizzlers Frontend CI/CD Workflow
 
-This repository contains the frontend application for Rizzlers, along with the infrastructure as code (Terraform) and CI/CD pipeline configuration.
+This repository contains the infrastructure as code (Terraform) and CI/CD workflows for deploying the Rizzlers Frontend application to AWS S3 and CloudFront.
 
-## Project Structure
+## Architecture Overview
+
+The frontend application is deployed with the following architecture:
+- **S3 Bucket**: Hosts the static website files (React application)
+- **CloudFront Distribution**: Serves the content with low latency globally
+- **GitHub Actions**: Automates the deployment process
+
+## CI/CD Workflow
+
+The GitHub Actions workflow automates the entire deployment process:
+
+1. When code is pushed to the `dev` or `QA` branch, the workflow is triggered
+2. Terraform creates/updates the necessary AWS infrastructure:
+   - S3 bucket for hosting the static files
+   - CloudFront distribution for content delivery
+3. The React application is built
+4. The built files are uploaded to the S3 bucket
+5. CloudFront cache is invalidated to ensure the latest content is served
+
+### Branch-Based Deployments
+
+- **dev branch**: Deploys to the development environment
+- **QA branch**: Deploys to the QA environment
+
+## Infrastructure as Code (Terraform)
+
+The Terraform configurations are organized in a modular way:
 
 ```
-├── frontend/                   # React frontend application
-├── terraform/                  # Terraform infrastructure as code
-│   ├── modules/                # Reusable Terraform modules
-│   │   ├── cloudfront/         # CloudFront distribution module
-│   │   ├── iam/                # IAM policies and roles module
-│   │   ├── s3/                 # S3 bucket module
-│   │   └── state/              # State management module
-│   └── environments/           # Environment-specific configurations
-│       ├── dev/                # Development environment
-│       └── qa/                 # QA environment
-└── buildspec.yml               # AWS CodeBuild configuration
+terraform/
+├── main.tf
+├── modules/
+    ├── frontend/
+        ├── s3/
+        │   └── main.tf
+        └── cloudfront/
+            ├── main.tf
+            └── variables.tf
 ```
 
-## Infrastructure
+### State Management
 
-The infrastructure is managed with Terraform and deployed on AWS. The following resources are provisioned:
+Terraform state is stored in an S3 bucket:
+- Bucket: `rizzlers-ibe-dev-tfstate`
+- Key: `frontend/terraform.tfstate`
 
-- S3 buckets for:
-  - Frontend static website hosting
-  - Terraform state
-- CloudFront distribution for content delivery
-- IAM policies for CI/CD
-- DynamoDB table for Terraform state locking
+## Tagging Strategy
 
-## CI/CD Pipeline
+All resources are tagged with:
+- **Name**: Rizzlers-[resource-name]
+- **Creator**: RizzlersTeam
+- **Purpose**: IBE
 
-The CI/CD pipeline is implemented using AWS CodeBuild and triggered by GitHub webhooks. The pipeline:
+## Frontend Application
 
-1. Detects which branch triggered the build (dev or qa)
-2. Runs Terraform to provision/update infrastructure
-3. Builds the frontend application
-4. Deploys the frontend to the corresponding S3 bucket
-5. Invalidates the CloudFront cache
+The frontend application is a React application built with:
+- React
+- TypeScript
+- Vite
 
-## Setup Instructions
+## Accessing the Application
 
-### Prerequisites
+After deployment, the application is available at:
+- Development: https://[cloudfront-domain-dev]
+- QA: https://[cloudfront-domain-qa]
 
-- AWS Account
-- GitHub Repository with dev and qa branches
-- AWS Parameter Store entries for:
-  - /rizzlers/aws/access_key_id
-  - /rizzlers/aws/secret_access_key
+## Setup Requirements
 
-### Initial Setup
+To use this workflow, you need to set up the following GitHub secrets:
+- `AWS_ROLE_ARN`: The ARN of an AWS IAM role with permissions to:
+  - Create/update S3 buckets
+  - Create/update CloudFront distributions
+  - Read/write to the S3 state bucket
 
-1. **Create the Terraform state resources manually**:
+## Local Development
 
-```bash
-cd terraform/environments/dev
-terraform init
-terraform apply -var="create_state_resources=true"
-```
+For local development:
 
-2. **Set up AWS CodeBuild**:
-   - Create a CodeBuild project
-   - Connect to your GitHub repository
-   - Configure webhook to trigger builds on changes to dev and qa branches
-   - Set buildspec location to buildspec.yml
-   - Set up appropriate IAM roles with permissions to:
-     - Access the parameter store
-     - Create/update AWS resources
-     - Deploy to S3
-     - Invalidate CloudFront
-
-### Deployment
-
-The CI/CD pipeline automatically deploys changes:
-- Commits to the `dev` branch deploy to the development environment
-- Commits to the `qa` branch deploy to the QA environment
-
-## Manual Deployment
-
-If needed, you can manually deploy:
-
-```bash
-# For development
-cd terraform/environments/dev
-terraform init
-terraform apply
-
-# For QA
-cd terraform/environments/qa
-terraform init
-terraform apply
-```
-
-## Frontend Build
-
-To build the frontend locally:
-
+1. Install dependencies:
 ```bash
 cd frontend
 npm install
-npm run build
+```
+
+2. Start the development server:
+```bash
+npm run dev
 ```
