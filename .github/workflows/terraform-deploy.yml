@@ -292,24 +292,27 @@ jobs:
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: terraform apply -auto-approve -input=false
         
-      - name: Get Terraform Outputs
-        id: terraform_outputs
+      - name: Set S3 Bucket Name
+        id: set_bucket
+        run: |
+          # Use a hardcoded bucket name based on workspace
+          echo "S3_BUCKET=rizzlers-ibe-frontend-${{ env.WORKSPACE }}" >> $GITHUB_ENV
+        
+      - name: Get CloudFront Domain
+        id: cloudfront_domain
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: |
-          # Use a more robust approach to get terraform outputs
-          BUCKET_NAME=$(terraform output -json | jq -r '.bucket_name.value // empty')
-          CLOUDFRONT_DOMAIN=$(terraform output -json | jq -r '.cloudfront_distribution_domain.value // empty')
-          
-          # Use default values if outputs are empty
-          if [ -z "$BUCKET_NAME" ]; then
-            BUCKET_NAME="rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
+          # Try to get the CloudFront domain if available, but don't fail if it's not
+          CF_DOMAIN=$(terraform output cloudfront_distribution_domain || echo "")
+          if [ ! -z "$CF_DOMAIN" ]; then
+            # Remove quotes if present
+            CF_DOMAIN=$(echo $CF_DOMAIN | tr -d '"')
+            echo "CLOUDFRONT_DOMAIN=$CF_DOMAIN" >> $GITHUB_ENV
+            echo "CloudFront domain: $CF_DOMAIN"
+          else
+            echo "CloudFront domain not available yet"
           fi
-          
-          echo "S3_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
-          
-          if [ ! -z "$CLOUDFRONT_DOMAIN" ]; then
-            echo "CLOUDFRONT_DOMAIN=$CLOUDFRONT_DOMAIN" >> $GITHUB_ENV
-          fi
+        continue-on-error: true
 
   build-and-deploy:
     name: "Build and Deploy Frontend"
@@ -348,33 +351,44 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          # Make sure S3_BUCKET is set
-          if [ -z "${{ env.S3_BUCKET }}" ]; then
-            S3_BUCKET="rizzlers-ibe-frontend-${{ needs.terraform.outputs.WORKSPACE || 'dev' }}"
-            echo "Using default S3 bucket: $S3_BUCKET"
-          else
-            S3_BUCKET="${{ env.S3_BUCKET }}"
+          # Use the S3 bucket name from terraform job
+          S3_BUCKET="${{ env.S3_BUCKET }}"
+          if [ -z "$S3_BUCKET" ]; then
+            # Default fallback
+            S3_BUCKET="rizzlers-ibe-frontend-dev"
           fi
           
-          # Deploy to S3
+          echo "Deploying to S3 bucket: $S3_BUCKET"
           aws s3 sync ./dist/ s3://$S3_BUCKET/ --delete
         
       - name: Invalidate CloudFront Cache
         run: |
-          # Get the CloudFront distribution ID for the S3 bucket
-          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[].DomainName, '${{ env.S3_BUCKET }}')].Id" --output text)
+          # Get the S3 bucket name
+          S3_BUCKET="${{ env.S3_BUCKET }}"
+          if [ -z "$S3_BUCKET" ]; then
+            S3_BUCKET="rizzlers-ibe-frontend-dev"
+          fi
           
-          if [ ! -z "$DISTRIBUTION_ID" ]; then
-            echo "Invalidating CloudFront distribution: $DISTRIBUTION_ID"
+          # Find CloudFront distribution directly from AWS API
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[].DomainName, '$S3_BUCKET')].Id" --output text)
+          
+          if [ -n "$DISTRIBUTION_ID" ]; then
+            echo "Found distribution ID: $DISTRIBUTION_ID"
             aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
           else
-            echo "No CloudFront distribution found for S3 bucket: ${{ env.S3_BUCKET }}"
+            echo "No CloudFront distribution found associated with $S3_BUCKET"
+            echo "List of CloudFront distributions:"
+            aws cloudfront list-distributions --query "DistributionList.Items[].{Id:Id, Domain:DomainName, Origins:Origins.Items[].DomainName}" --output json
+            echo "Skipping invalidation"
           fi
+        continue-on-error: true
 
       - name: Deployment Info
         run: |
           echo "Frontend deployed to:"
           echo "S3 Bucket: ${{ env.S3_BUCKET }}"
-          if [ ! -z "${{ env.CLOUDFRONT_DOMAIN }}" ]; then
+          if [ -n "${{ env.CLOUDFRONT_DOMAIN }}" ]; then
             echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}"
+          else
+            echo "CloudFront distribution not available yet"
           fi 
