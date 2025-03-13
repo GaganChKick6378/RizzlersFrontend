@@ -195,17 +195,24 @@ phases:
           npm install
           npm run build
           cd ..
+          # Copy build output to a predictable location
+          if [ -d "frontend/dist" ]; then
+            mkdir -p dist
+            cp -r frontend/dist/* dist/
+          elif [ -d "frontend/build" ]; then
+            mkdir -p dist
+            cp -r frontend/build/* dist/
+          fi
         else
           # If no frontend directory exists, create a simple build output
           mkdir -p dist
           echo '<html><body><h1>Rizzlers Frontend</h1><p>Placeholder page</p></body></html>' > dist/index.html
         fi
-      - ls -la  # List files again
+      - ls -la dist/  # List files in dist directory
       - # Upload to S3 regardless of build path
       - |
-        if [ -d "frontend/dist" ]; then
-          aws s3 sync frontend/dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
-        elif [ -d "dist" ]; then
+        if [ -d "dist" ]; then
+          echo "Uploading from dist directory to S3"
           aws s3 sync dist/ s3://$S3_BUCKET_NAME/ --delete || echo "S3 sync failed"
         else
           echo "No dist directory found, creating one..."
@@ -223,20 +230,26 @@ phases:
     commands:
       - echo "Build complete"
       - echo "=============================================================="
-      - echo "=============================================================="
-      - # Ensure dist artifacts exist for the artifact upload phase
+      - echo "Debug information about directories:"
+      - find . -type d | grep dist || echo "No dist directories found"
+      - echo "Current working directory: $(pwd)"
+      - ls -la
       - |
-        if [ ! -d "dist" ] && [ ! -d "frontend/dist" ]; then
+        # Ensure dist directory exists and has content
+        if [ ! -d "dist" ]; then
+          echo "Creating dist directory for artifacts"
           mkdir -p dist
-          echo "Placeholder content" > dist/index.html
+          echo '<html><body><h1>Rizzlers Frontend</h1><p>Placeholder for artifacts</p></body></html>' > dist/index.html
         fi
-      - # Copy buildspec.yml to ensure at least one artifact exists
-      - cp buildspec.yml $([ -d "frontend/dist" ] && echo "frontend/dist/" || echo "dist/")
+      - echo "Contents of dist directory:"
+      - ls -la dist/ || echo "Could not list dist directory"
+      - # Ensure we have at least one file in the artifacts directory
+      - cp buildspec.yml dist/
 
 artifacts:
   files:
     - '**/*'
-  base-directory: $([ -d "frontend/dist" ] && echo "frontend/dist" || echo "dist")
+  base-directory: 'dist'
   discard-paths: no
 
 cache:
