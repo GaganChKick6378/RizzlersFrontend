@@ -2,11 +2,7 @@ locals {
   bucket_name = "rizzlers-ibe-frontend-${terraform.workspace}"
 }
 
-# Check if the bucket already exists using a data source with try function
-data "aws_s3_bucket" "existing_bucket" {
-  bucket = local.bucket_name
-  count  = 0 # Set to 0 to avoid the error when bucket doesn't exist yet
-}
+# Remove data source completely as it's causing problems
 
 resource "aws_s3_bucket" "frontend" {
   bucket = local.bucket_name
