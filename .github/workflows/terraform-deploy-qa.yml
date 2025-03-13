@@ -21,6 +21,9 @@ jobs:
       run:
         working-directory: terraform
 
+    outputs:
+      environment: ${{ steps.workspace.outputs.WORKSPACE }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.1.1
@@ -355,6 +358,7 @@ jobs:
         id: workspace
         run: |
           echo "WORKSPACE=qa" >> $GITHUB_ENV
+          echo "WORKSPACE=qa" >> $GITHUB_OUTPUT
 
       - name: Terraform Init
         run: terraform init
@@ -391,7 +395,7 @@ jobs:
           terraform show -no-color tfplan > tfplan.txt
       
       - name: Save Plan as Artifact
-        uses: actions/upload-artifact@v3.1.3
+        uses: actions/upload-artifact@v3
         with:
           name: terraform-plan
           path: terraform/tfplan.txt
@@ -436,7 +440,7 @@ jobs:
     
     steps:
       - name: Download Plan
-        uses: actions/download-artifact@v3.1.2
+        uses: actions/download-artifact@v3
         with:
           name: terraform-plan
           path: .
@@ -459,6 +463,9 @@ jobs:
       run:
         working-directory: terraform
 
+    outputs:
+      environment: ${{ steps.workspace.outputs.WORKSPACE }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4.1.1
@@ -471,7 +478,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v2
+        uses: hashicorp/setup-terraform@v2.0.3
         with:
           terraform_version: 1.5.7
 
@@ -596,7 +603,7 @@ jobs:
       - name: Build Frontend
         run: npm run build
         env:
-          VITE_APP_ENV: ${{ env.WORKSPACE }}
+          VITE_APP_ENV: ${{ needs.terraform-apply.outputs.environment || 'qa' }}
           
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
