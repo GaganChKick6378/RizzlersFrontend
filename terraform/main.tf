@@ -9,12 +9,12 @@ terraform {
   backend "s3" {
     bucket = "rizzlers-ibe-dev-tfstate"
     key    = "frontend/terraform.tfstate"
-    region = "us-east-1"
+    region = "ap-south-1"
   }
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region = "ap-south-1"
   default_tags {
     tags = {
       Creator = "RizzlersTeam"
