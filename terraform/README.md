@@ -38,7 +38,7 @@ A DynamoDB table named "rizzlers-terraform-locks" is used for state locking.
 ## Outputs
 
 - `website_url`: The CloudFront URL of the website
-- `s3_bucket_name`: The name of the S3 bucket hosting the website content
-- `cloudfront_distribution_id`: The ID of the CloudFront distribution
-- `state_bucket_name`: The name of the S3 bucket for terraform state
-- `terraform_locks_table`: The name of the DynamoDB table for terraform locks 
+- `frontend_s3_bucket_name`: The name of the S3 bucket hosting the website content
+- `frontend_cloudfront_distribution_id`: The ID of the CloudFront distribution
+- `terraform_state_bucket_name`: The name of the S3 bucket for terraform state
+- `terraform_locks_table_name`: The name of the DynamoDB table for terraform locks 

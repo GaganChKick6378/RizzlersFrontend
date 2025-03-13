@@ -20,22 +20,22 @@ output "website_url" {
   description = "The CloudFront URL of the website"
 }
 
-output "s3_bucket_name" {
+output "frontend_s3_bucket_name" {
   value       = module.environment_config.s3_bucket_name
   description = "The name of the S3 bucket hosting the website content"
 }
 
-output "cloudfront_distribution_id" {
+output "frontend_cloudfront_distribution_id" {
   value       = module.environment_config.cloudfront_distribution_id
   description = "The ID of the CloudFront distribution"
 }
 
-output "state_bucket_name" {
+output "terraform_state_bucket_name" {
   value       = module.environment_config.state_bucket_name
   description = "The name of the S3 bucket for terraform state"
 }
 
-output "terraform_locks_table" {
+output "terraform_locks_table_name" {
   value       = module.environment_config.terraform_locks_table
   description = "The name of the DynamoDB table for terraform locks"
 } 
