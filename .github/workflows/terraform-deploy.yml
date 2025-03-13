@@ -1,19 +1,17 @@
-name: Terraform and Frontend Deployment
+name: Terraform and Frontend Deployment - Dev Environment
 
 on:
   push:
     branches:
       - dev
-      - QA
   pull_request:
     branches:
       - dev
-      - QA
     types: [closed]
 
 jobs:
   terraform:
-    name: "Terraform"
+    name: "Terraform for Dev"
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -59,6 +57,7 @@ jobs:
               tags = {
                 Creator = "RizzlersTeam"
                 Purpose = "IBE"
+                Environment = terraform.workspace
               }
             }
           }
@@ -82,6 +81,11 @@ jobs:
           output "bucket_name" {
             description = "The name of the S3 bucket"
             value       = module.frontend_s3.bucket_name
+          }
+          
+          output "environment" {
+            description = "Current environment (workspace)"
+            value       = terraform.workspace
           }
           EOF
 
@@ -145,7 +149,7 @@ jobs:
             bucket = local.bucket_name
             
             tags = {
-              Name = "Rizzlers-Frontend-S3"
+              Name = "Rizzlers-Frontend-S3-\${terraform.workspace}"
             }
 
             # Don't recreate if only these attributes change
@@ -230,7 +234,7 @@ jobs:
 
           cat <<EOF > modules/frontend/cloudfront/main.tf
           resource "aws_cloudfront_origin_access_identity" "frontend" {
-            comment = "OAI for Rizzlers Frontend"
+            comment = "OAI for Rizzlers Frontend - \${terraform.workspace}"
           }
 
           resource "aws_cloudfront_distribution" "frontend" {
@@ -241,7 +245,7 @@ jobs:
             
             origin {
               domain_name = var.bucket_regional_domain_name
-              origin_id   = "S3-rizzlers-frontend"
+              origin_id   = "S3-rizzlers-frontend-\${terraform.workspace}"
               
               custom_origin_config {
                 http_port              = 80
@@ -254,7 +258,7 @@ jobs:
             default_cache_behavior {
               allowed_methods  = ["GET", "HEAD", "OPTIONS"]
               cached_methods   = ["GET", "HEAD"]
-              target_origin_id = "S3-rizzlers-frontend"
+              target_origin_id = "S3-rizzlers-frontend-\${terraform.workspace}"
               
               forwarded_values {
                 query_string = false
@@ -293,7 +297,7 @@ jobs:
             }
             
             tags = {
-              Name = "Rizzlers-Frontend-CloudFront"
+              Name = "Rizzlers-Frontend-CloudFront-\${terraform.workspace}"
             }
 
             # Prevent recreation issues
@@ -345,15 +349,11 @@ jobs:
         with:
           terraform_version: 1.5.7
 
-      # Determine the Terraform workspace based on the branch
+      # Set workspace to dev for development branch
       - name: Set Terraform Workspace
         id: workspace
         run: |
-          if [[ "${{ github.ref }}" == "refs/heads/QA" ]]; then
-            echo "WORKSPACE=qa" >> $GITHUB_ENV
-          else
-            echo "WORKSPACE=dev" >> $GITHUB_ENV
-          fi
+          echo "WORKSPACE=dev" >> $GITHUB_ENV
 
       - name: Terraform Init
         run: terraform init
@@ -413,9 +413,11 @@ jobs:
         continue-on-error: true
 
   build-and-deploy:
-    name: "Build and Deploy Frontend"
+    name: "Build and Deploy Frontend - Dev"
     needs: terraform
     runs-on: ubuntu-latest
+    env:
+      WORKSPACE: dev
     
     defaults:
       run:
@@ -483,7 +485,7 @@ jobs:
 
       - name: Deployment Info
         run: |
-          echo "Frontend deployed to:"
+          echo "Frontend deployed to Dev environment:"
           echo "S3 Bucket: ${{ env.S3_BUCKET }}"
           if [ -n "${{ env.CLOUDFRONT_DOMAIN }}" ]; then
             echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}"
