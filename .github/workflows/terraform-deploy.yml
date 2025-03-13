@@ -46,6 +46,14 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.TERRAFORM_STATE_REGION }}
+          mask-aws-account-id: true
+
+      - name: Create S3 State Bucket
+        run: |
+          aws s3api create-bucket \
+            --bucket ${{ env.TERRAFORM_STATE_BUCKET }} \
+            --region ${{ env.TERRAFORM_STATE_REGION }} \
+            --create-bucket-configuration LocationConstraint=${{ env.TERRAFORM_STATE_REGION }} || true
 
       - name: Create Terraform Configuration
         run: |
@@ -180,6 +188,7 @@ jobs:
             }
           }
 
+          # Outputs
           output "s3_bucket_name" {
             value = aws_s3_bucket.frontend_bucket.id
           }
@@ -205,7 +214,7 @@ jobs:
       - name: Terraform Init
         run: |
           cd terraform/environments/${{ env.DEFAULT_ENVIRONMENT }}
-          terraform init
+          terraform init -reconfigure
 
       - name: Terraform Plan
         run: |
