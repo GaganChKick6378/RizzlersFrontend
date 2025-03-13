@@ -28,10 +28,10 @@ module "frontend_s3" {
 }
 
 module "frontend_cloudfront" {
-  source = "./modules/frontend/cloudfront"
-  bucket_name = module.frontend_s3.bucket_name
+  source                     = "./modules/frontend/cloudfront"
+  bucket_name                = module.frontend_s3.bucket_name
   bucket_regional_domain_name = module.frontend_s3.bucket_regional_domain_name
-  depends_on = [module.frontend_s3]
+  depends_on                 = [module.frontend_s3]
 }
 
 output "cloudfront_distribution_domain" {
