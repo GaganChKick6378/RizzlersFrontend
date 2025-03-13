@@ -4,11 +4,11 @@ This Terraform configuration provisions the necessary AWS resources for deployin
 
 ## Directory Structure
 
-- `backend.tf`: Contains the S3 backend configuration for Terraform state
-- `main.tf`: Main entry point that loads the environment-specific configuration
+- `backend.tf`: Contains the common S3 backend configuration
+- `main.tf`: A wrapper that can load environment-specific configurations
 - `environments/`: Contains environment-specific configurations
-  - `dev/`: Development environment configuration
-  - `qa/`: QA environment configuration
+  - `dev/`: Development environment configuration (self-contained)
+  - `qa/`: QA environment configuration (self-contained)
 - `modules/`: Reusable Terraform modules
   - `s3/`: S3 bucket configuration
   - `cloudfront/`: CloudFront distribution
@@ -17,28 +17,34 @@ This Terraform configuration provisions the necessary AWS resources for deployin
 
 ## Usage
 
-To deploy to a specific environment:
+### Option 1: Using environment directories directly (recommended for CI/CD)
 
 ```bash
-# Initialize Terraform with the S3 backend
+# Navigate to the specific environment
+cd environments/dev
+
+# Initialize and apply
 terraform init
-
-# Deploy to development environment (default)
 terraform apply
+```
 
-# Or specify a different environment
-terraform apply -var="environment=qa"
+### Option 2: Using the root wrapper (for local development)
+
+```bash
+# From the root terraform directory
+terraform init
+terraform apply -var="environment=dev"
 ```
 
 ## State Management
 
-The Terraform state is stored in an S3 bucket named "rizzlers-ibe-dev-tfstate" in the "frontend" folder. 
+The Terraform state is stored in an S3 bucket named "rizzlers-ibe-dev-tfstate" in the "frontend/{env}" folder. 
 A DynamoDB table named "rizzlers-terraform-locks" is used for state locking.
 
 ## Outputs
 
 - `website_url`: The CloudFront URL of the website
-- `frontend_s3_bucket_name`: The name of the S3 bucket hosting the website content
-- `frontend_cloudfront_distribution_id`: The ID of the CloudFront distribution
-- `terraform_state_bucket_name`: The name of the S3 bucket for terraform state
-- `terraform_locks_table_name`: The name of the DynamoDB table for terraform locks 
+- `s3_bucket_name`: The name of the S3 bucket hosting the website content
+- `cloudfront_distribution_id`: The ID of the CloudFront distribution
+- `state_bucket_name`: The name of the S3 bucket for terraform state (dev only)
+- `terraform_locks_table`: The name of the DynamoDB table for terraform locks (dev only) 
