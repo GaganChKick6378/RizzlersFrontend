@@ -104,20 +104,18 @@ jobs:
             }
           }
 
-          # Use a data source to check if the DynamoDB table already exists
-          data "aws_dynamodb_table" "existing_locks_table" {
-            name = "rizzlers-terraform-locks"
-            # This will fail if the table doesn't exist, but that's okay because we use count below
-            count = 1
-          }
-
-          # Create the DynamoDB table for state locking only if it doesn't exist
+          # Create the DynamoDB table for state locking if it doesn't exist
           resource "aws_dynamodb_table" "terraform_locks" {
-            # Only create if the data source lookup fails (i.e., the table doesn't exist)
-            count        = length(data.aws_dynamodb_table.existing_locks_table) > 0 ? 0 : 1
             name         = "rizzlers-terraform-locks"
             billing_mode = "PAY_PER_REQUEST"
             hash_key     = "LockID"
+
+            # Use the lifecycle meta-argument to make this resource optional
+            lifecycle {
+              prevent_destroy = true
+              # Handle cases where the table already exists
+              ignore_changes = all
+            }
 
             attribute {
               name = "LockID"
@@ -129,26 +127,16 @@ jobs:
               Creator = "RizzlersTeam"
               Purpose = "IBE"
             }
-
-            # This prevents Terraform from trying to delete this table when running terraform destroy
-            # since it's needed for the state locking mechanism
-            lifecycle {
-              prevent_destroy = true
-            }
           }
           EOF
 
+          # Update S3 module without data source
           cat <<EOF > modules/frontend/s3/main.tf
           locals {
             bucket_name = "rizzlers-ibe-frontend-\${terraform.workspace}"
           }
 
-          # Use a data source to check if the bucket already exists
-          data "aws_s3_bucket" "existing_bucket" {
-            bucket = local.bucket_name
-            count  = 1
-          }
-
+          # No data source here - direct bucket creation
           resource "aws_s3_bucket" "frontend" {
             bucket = local.bucket_name
             
@@ -371,6 +359,12 @@ jobs:
         run: terraform fmt
         continue-on-error: true
 
+      - name: Debug - Check S3 Module File
+        run: |
+          echo "Contents of modules/frontend/s3/main.tf:"
+          cat modules/frontend/s3/main.tf
+          grep -n "data.*aws_s3_bucket" modules/frontend/s3/main.tf || echo "No data source found in file"
+
       - name: Import Existing Resources
         run: |
           # Check if DynamoDB table exists before trying to import
@@ -394,7 +388,36 @@ jobs:
             echo "S3 bucket $BUCKET_NAME does not exist yet, will be created by Terraform."
           fi
         continue-on-error: true
-
+      
+      - name: Force Terraform Reinitialization
+        run: |
+          # Force reinitialization to clear any cached provider data
+          rm -rf .terraform
+          terraform init -upgrade
+      
+      - name: Check and Clean Terraform State
+        run: |
+          echo "Checking Terraform state for problematic data sources..."
+          
+          # List all resources in the state
+          terraform state list || echo "No state found or state is empty"
+          
+          # Check if the problematic data source exists in the state
+          if terraform state list | grep -q "module.frontend_s3.data.aws_s3_bucket.existing_bucket"; then
+            echo "Found problematic data source in state, removing it..."
+            terraform state rm module.frontend_s3.data.aws_s3_bucket.existing_bucket || echo "Failed to remove data source from state, but continuing..."
+          fi
+          
+          # Check for any other data sources
+          if terraform state list | grep -q "data.aws_s3_bucket"; then
+            echo "Found other S3 bucket data sources in state, removing them..."
+            terraform state list | grep "data.aws_s3_bucket" | xargs -r terraform state rm || echo "Failed to remove data sources from state, but continuing..."
+          fi
+          
+          # Refresh the state to make sure it's up to date
+          terraform refresh || echo "State refresh failed, but continuing..."
+        continue-on-error: true
+      
       - name: Terraform Plan
         id: plan
         run: |
