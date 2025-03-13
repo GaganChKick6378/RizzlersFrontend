@@ -431,36 +431,6 @@ jobs:
           name: terraform-plan
           path: terraform/tfplan.txt
           retention-days: 5
-      
-      # Send email notification about the pending deployment
-      - name: Send Email Notification
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{ secrets.MAIL_SERVER }}
-          server_port: ${{ secrets.MAIL_PORT }}
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "[QA Deployment] Approval Required for Rizzlers Frontend"
-          body: |
-            Hello Reviewer,
-            
-            A new QA deployment for Rizzlers Frontend requires your approval.
-            
-            Details:
-            - Branch: QA
-            - Triggered by: ${{ github.actor }}
-            - Commit: ${{ github.sha }}
-            
-            To approve this deployment, please go to:
-            ${{ github.server_url }}/${{ github.repository }}/actions/workflows/terraform-deploy-qa.yml
-            
-            You'll need to manually approve this deployment in the GitHub Actions workflow.
-            
-            Best regards,
-            Rizzlers CI/CD System
-          to: ${{ secrets.REVIEWER_EMAIL }}
-          from: Rizzlers CI/CD <${{ secrets.MAIL_USERNAME }}>
 
   # Step 2: Require manual approval before proceeding
   manual-approval:
@@ -678,29 +648,4 @@ jobs:
             echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}"
           else
             echo "CloudFront distribution not available yet"
-          fi
-          
-      - name: Send Success Notification
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: ${{ secrets.MAIL_SERVER }}
-          server_port: ${{ secrets.MAIL_PORT }}
-          username: ${{ secrets.MAIL_USERNAME }}
-          password: ${{ secrets.MAIL_PASSWORD }}
-          subject: "[QA Deployment] Successfully Deployed Rizzlers Frontend"
-          body: |
-            Hello Team,
-            
-            The QA deployment for Rizzlers Frontend has been successfully completed.
-            
-            Details:
-            - Branch: QA
-            - Triggered by: ${{ github.actor }}
-            - Commit: ${{ github.sha }}
-            - S3 Bucket: rizzlers-ibe-frontend-qa
-            - CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN || 'Not available yet' }}
-            
-            Best regards,
-            Rizzlers CI/CD System
-          to: ${{ secrets.REVIEWER_EMAIL }},${{ secrets.TEAM_EMAIL }}
-          from: Rizzlers CI/CD <${{ secrets.MAIL_USERNAME }}> 
+          fi 
