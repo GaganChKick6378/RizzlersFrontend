@@ -74,14 +74,20 @@ jobs:
           }
 
           module "frontend_cloudfront" {
-            source = "./modules/frontend/cloudfront"
-            bucket_name = module.frontend_s3.bucket_name
+            source                      = "./modules/frontend/cloudfront"
+            bucket_name                 = module.frontend_s3.bucket_name
             bucket_regional_domain_name = module.frontend_s3.bucket_regional_domain_name
-            depends_on = [module.frontend_s3]
+            depends_on                  = [module.frontend_s3]
           }
 
           output "cloudfront_distribution_domain" {
-            value = module.frontend_cloudfront.cloudfront_distribution_domain
+            description = "The domain name of the CloudFront distribution"
+            value       = module.frontend_cloudfront.cloudfront_distribution_domain
+          }
+          
+          output "bucket_name" {
+            description = "The name of the S3 bucket"
+            value       = module.frontend_s3.bucket_name
           }
           EOF
 
@@ -103,7 +109,7 @@ jobs:
 
           resource "aws_s3_bucket_public_access_block" "frontend" {
             bucket = aws_s3_bucket.frontend.id
-          
+
             block_public_acls       = false
             block_public_policy     = false
             ignore_public_acls      = false
@@ -133,7 +139,7 @@ jobs:
           }
 
           resource "aws_s3_bucket_policy" "frontend" {
-            bucket = aws_s3_bucket.frontend.id
+            bucket     = aws_s3_bucket.frontend.id
             depends_on = [aws_s3_bucket_public_access_block.frontend]
             
             policy = jsonencode({
@@ -150,15 +156,18 @@ jobs:
           }
 
           output "bucket_name" {
-            value = aws_s3_bucket.frontend.id
+            description = "The name of the S3 bucket"
+            value       = aws_s3_bucket.frontend.id
           }
 
           output "bucket_regional_domain_name" {
-            value = aws_s3_bucket.frontend.bucket_regional_domain_name
+            description = "The regional domain name of the S3 bucket"
+            value       = aws_s3_bucket.frontend.bucket_regional_domain_name
           }
 
           output "website_endpoint" {
-            value = aws_s3_bucket_website_configuration.frontend.website_endpoint
+            description = "The website endpoint of the S3 bucket"
+            value       = aws_s3_bucket_website_configuration.frontend.website_endpoint
           }
           EOF
 
@@ -232,7 +241,8 @@ jobs:
           }
 
           output "cloudfront_distribution_domain" {
-            value = aws_cloudfront_distribution.frontend.domain_name
+            description = "The domain name of the CloudFront distribution"
+            value       = aws_cloudfront_distribution.frontend.domain_name
           }
           EOF
 
@@ -286,8 +296,20 @@ jobs:
         id: terraform_outputs
         if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
         run: |
-          echo "S3_BUCKET=$(terraform output -raw bucket_name)" >> $GITHUB_ENV
-          echo "CLOUDFRONT_DOMAIN=$(terraform output -raw cloudfront_distribution_domain)" >> $GITHUB_ENV
+          # Use a more robust approach to get terraform outputs
+          BUCKET_NAME=$(terraform output -json | jq -r '.bucket_name.value // empty')
+          CLOUDFRONT_DOMAIN=$(terraform output -json | jq -r '.cloudfront_distribution_domain.value // empty')
+          
+          # Use default values if outputs are empty
+          if [ -z "$BUCKET_NAME" ]; then
+            BUCKET_NAME="rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
+          fi
+          
+          echo "S3_BUCKET=$BUCKET_NAME" >> $GITHUB_ENV
+          
+          if [ ! -z "$CLOUDFRONT_DOMAIN" ]; then
+            echo "CLOUDFRONT_DOMAIN=$CLOUDFRONT_DOMAIN" >> $GITHUB_ENV
+          fi
 
   build-and-deploy:
     name: "Build and Deploy Frontend"
@@ -326,14 +348,33 @@ jobs:
 
       - name: Deploy to S3
         run: |
-          aws s3 sync ./dist/ s3://${{ env.S3_BUCKET }}/ --delete
+          # Make sure S3_BUCKET is set
+          if [ -z "${{ env.S3_BUCKET }}" ]; then
+            S3_BUCKET="rizzlers-ibe-frontend-${{ needs.terraform.outputs.WORKSPACE || 'dev' }}"
+            echo "Using default S3 bucket: $S3_BUCKET"
+          else
+            S3_BUCKET="${{ env.S3_BUCKET }}"
+          fi
+          
+          # Deploy to S3
+          aws s3 sync ./dist/ s3://$S3_BUCKET/ --delete
         
       - name: Invalidate CloudFront Cache
         run: |
-          aws cloudfront create-invalidation --distribution-id $(aws cloudfront list-distributions --query "DistributionList.Items[?Aliases.Items[?contains(@, '${{ env.S3_BUCKET }}')]].Id" --output text) --paths "/*"
+          # Get the CloudFront distribution ID for the S3 bucket
+          DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[].DomainName, '${{ env.S3_BUCKET }}')].Id" --output text)
+          
+          if [ ! -z "$DISTRIBUTION_ID" ]; then
+            echo "Invalidating CloudFront distribution: $DISTRIBUTION_ID"
+            aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          else
+            echo "No CloudFront distribution found for S3 bucket: ${{ env.S3_BUCKET }}"
+          fi
 
       - name: Deployment Info
         run: |
           echo "Frontend deployed to:"
           echo "S3 Bucket: ${{ env.S3_BUCKET }}"
-          echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}" 
+          if [ ! -z "${{ env.CLOUDFRONT_DOMAIN }}" ]; then
+            echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}"
+          fi 
