@@ -5,12 +5,6 @@ terraform {
       version = "~> 5.0"
     }
   }
-  
-  backend "s3" {
-    bucket = "rizzlers-ibe-dev-tfstate"
-    key    = "frontend/terraform.tfstate"
-    region = "ap-south-1"
-  }
 }
 
 provider "aws" {
@@ -28,12 +22,18 @@ module "frontend_s3" {
 }
 
 module "frontend_cloudfront" {
-  source                     = "./modules/frontend/cloudfront"
-  bucket_name                = module.frontend_s3.bucket_name
+  source                      = "./modules/frontend/cloudfront"
+  bucket_name                 = module.frontend_s3.bucket_name
   bucket_regional_domain_name = module.frontend_s3.bucket_regional_domain_name
-  depends_on                 = [module.frontend_s3]
+  depends_on                  = [module.frontend_s3]
 }
 
 output "cloudfront_distribution_domain" {
-  value = module.frontend_cloudfront.cloudfront_distribution_domain
+  description = "The domain name of the CloudFront distribution"
+  value       = module.frontend_cloudfront.cloudfront_distribution_domain
+}
+
+output "bucket_name" {
+  description = "The name of the S3 bucket"
+  value       = module.frontend_s3.bucket_name
 } 
