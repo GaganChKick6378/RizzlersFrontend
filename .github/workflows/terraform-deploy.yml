@@ -3,7 +3,11 @@ name: Terraform Deploy Frontend
 on:
   push:
     branches:
-      - main  # Change this to your main branch name if different
+      - dev  # Trigger on direct pushes to dev branch
+  pull_request:
+    types: [closed]
+    branches:
+      - dev  # Trigger when PRs are merged into dev branch
   workflow_dispatch:  # Allow manual triggers
 
 env:
@@ -17,6 +21,8 @@ env:
 jobs:
   terraform-deploy:
     runs-on: ubuntu-latest
+    # Only run this job when push event or PR is merged (not when PR is just closed without merging)
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     
     steps:
       - name: Checkout repository
