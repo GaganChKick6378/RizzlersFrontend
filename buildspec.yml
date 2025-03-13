@@ -232,7 +232,6 @@ phases:
       - echo "=============================================================="
       - echo "Debug information about directories:"
       - find . -type d | grep dist || echo "No dist directories found"
-      - echo "Current working directory: $(pwd)"
       - ls -la
       - |
         # Ensure dist directory exists and has content
