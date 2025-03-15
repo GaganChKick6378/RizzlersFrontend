@@ -41,7 +41,7 @@ const Header = ({ changeLanguage }: { changeLanguage: (language: 'en' | 'es' | '
       <div className="flex space-x-8 items-center">
         <a 
           href="/my-bookings" 
-          className="text-sm text-[#130739] hover:text-gray-300"
+          className="text-sm text-[#130739] hover:text-gray-300 cursor-pointer"
           onClick={(e) => {
             e.preventDefault();
             navigate('/my-bookings');
@@ -52,7 +52,7 @@ const Header = ({ changeLanguage }: { changeLanguage: (language: 'en' | 'es' | '
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={toggleDropdown}
-            className="flex items-center space-x-2 text-[#130739] py-2 px-4 rounded-md"
+            className="flex items-center space-x-2 text-[#130739] py-2 px-4 rounded-md cursor-pointer"
           >
             <img src={FiGlobe} alt="Language" className="w-4 h-4 mr-1" />
             <span>{intl.formatMessage({ id: 'language' })}</span>
@@ -70,7 +70,7 @@ const Header = ({ changeLanguage }: { changeLanguage: (language: 'en' | 'es' | '
         <span className="text-[#130739] text-sm flex items-center">
           <img src={Vector} alt="Currency" className="w-4 h-4 mr-1" /> USD
         </span>
-        <button className="bg-[#26266d] py-2 px-4 rounded-md text-white text-sm">LOGIN</button>
+        <button className="bg-[#26266d] py-2 px-4 rounded-md text-white text-sm cursor-pointer">LOGIN</button>
       </div>
     </header>
   );
