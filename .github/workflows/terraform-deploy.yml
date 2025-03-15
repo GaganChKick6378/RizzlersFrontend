@@ -4,18 +4,13 @@ on:
   push:
     branches:
       - dev
-  pull_request:
-    branches:
-      - dev
-    types:
-      - closed
 
 jobs:
   terraform:
     name: "Terraform for Dev"
     runs-on: ubuntu-latest
-    # Only run this job when the pull request is merged or on direct push to dev
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    # Only run this job on direct push to dev
+    if: github.ref == 'refs/heads/dev'
     permissions:
       contents: read
     
@@ -418,7 +413,7 @@ jobs:
     name: "Build and Deploy Frontend - Dev"
     needs: terraform
     # Only run this job when the pull request is merged or on direct push to dev
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     
     defaults:
@@ -428,6 +423,9 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v3
+
+      - name: Set Workspace Environment Variable
+        run: echo "WORKSPACE=${{ needs.terraform.outputs.environment }}" >> $GITHUB_ENV
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -439,11 +437,21 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build Frontend
-        run: npm run build
-        env:
-          VITE_APP_ENV: ${{ needs.terraform.outputs.environment }}
+      - name: Build Frontend for Dev Environment
+        run: |
+          # Create a temporary .env.sentry-build-plugin file with Sentry configuration
+          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" > .env.sentry-build-plugin
+          echo "SENTRY_ORG=${{ secrets.SENTRY_ORG }}" >> .env.sentry-build-plugin
+          echo "SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}" >> .env.sentry-build-plugin
           
+          # Create or update the config/.env.dev.anv file
+          mkdir -p config
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL_DEV }}" > config/.env.dev.anv
+          echo "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}" >> config/.env.dev.anv
+          
+          # Run the dev-specific build
+          npm run dev:build
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -454,7 +462,7 @@ jobs:
       - name: Deploy to S3
         run: |
           # Use the S3 bucket name from terraform job
-          S3_BUCKET="rizzlers-ibe-frontend-dev"
+          S3_BUCKET="rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
           
           echo "Deploying to S3 bucket: $S3_BUCKET"
           aws s3 sync ./dist/ s3://$S3_BUCKET/ --delete
@@ -462,7 +470,7 @@ jobs:
       - name: Invalidate CloudFront Cache
         run: |
           # Get the S3 bucket name
-          S3_BUCKET="rizzlers-ibe-frontend-dev"
+          S3_BUCKET="rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
           
           # Find CloudFront distribution directly from AWS API
           DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?contains(Origins.Items[].DomainName, '$S3_BUCKET')].Id" --output text)
@@ -480,8 +488,8 @@ jobs:
 
       - name: Deployment Info
         run: |
-          echo "Frontend deployed to dev environment:"
-          echo "S3 Bucket: rizzlers-ibe-frontend-dev"
+          echo "Frontend deployed to ${{ env.WORKSPACE }} environment:"
+          echo "S3 Bucket: rizzlers-ibe-frontend-${{ env.WORKSPACE }}"
           if [ -n "${{ env.CLOUDFRONT_DOMAIN }}" ]; then
             echo "CloudFront URL: https://${{ env.CLOUDFRONT_DOMAIN }}"
           else
