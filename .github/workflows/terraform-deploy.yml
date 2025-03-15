@@ -7,11 +7,15 @@ on:
   pull_request:
     branches:
       - dev
+    types:
+      - closed
 
 jobs:
   terraform:
     name: "Terraform for Dev"
     runs-on: ubuntu-latest
+    # Only run this job when the pull request is merged or on direct push to dev
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     permissions:
       contents: read
     
@@ -413,6 +417,8 @@ jobs:
   build-and-deploy:
     name: "Build and Deploy Frontend - Dev"
     needs: terraform
+    # Only run this job when the pull request is merged or on direct push to dev
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     
     defaults:
