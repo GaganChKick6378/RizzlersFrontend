@@ -4,18 +4,13 @@ on:
   push:
     branches:
       - dev
-  pull_request:
-    branches:
-      - dev
-    types:
-      - closed
 
 jobs:
   terraform:
     name: "Terraform for Dev"
     runs-on: ubuntu-latest
-    # Only run this job when the pull request is merged or on direct push to dev
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    # Only run this job on direct push to dev
+    if: github.ref == 'refs/heads/dev'
     permissions:
       contents: read
     
@@ -415,10 +410,10 @@ jobs:
         continue-on-error: true
 
   build-and-deploy:
-    name: "Build and Deploy Frontend - \${{ needs.terraform.outputs.environment }}"
+    name: "Build and Deploy Frontend - Dev"
     needs: terraform
     # Only run this job when the pull request is merged or on direct push to dev
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest
     
     defaults:
@@ -443,7 +438,6 @@ jobs:
         run: npm ci
 
       - name: Build Frontend for Dev Environment
-        if: needs.terraform.outputs.environment == 'dev'
         run: |
           # Create a temporary .env.sentry-build-plugin file with Sentry configuration
           echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" > .env.sentry-build-plugin
@@ -458,22 +452,6 @@ jobs:
           # Run the dev-specific build
           npm run dev:build
 
-      - name: Build Frontend for QA Environment
-        if: needs.terraform.outputs.environment == 'qa'
-        run: |
-          # Create a temporary .env.sentry-build-plugin file with Sentry configuration
-          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" > .env.sentry-build-plugin
-          echo "SENTRY_ORG=${{ secrets.SENTRY_ORG }}" >> .env.sentry-build-plugin
-          echo "SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}" >> .env.sentry-build-plugin
-          
-          # Create or update the config/.env.qa.anv file
-          mkdir -p config
-          echo "VITE_API_URL=${{ secrets.VITE_API_URL_QA }}" > config/.env.qa.anv
-          echo "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}" >> config/.env.qa.anv
-          
-          # Run the qa-specific build
-          npm run qa:build
-          
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
