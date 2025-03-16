@@ -1,7 +1,6 @@
-// src/redux/dataSlice.ts
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { Student } from '../interfaces/student.interface';
-import { StudentState } from '../interfaces/studentState.interface';
+import { Student } from '../../interfaces/student.interface';
+import { StudentState } from '../../interfaces/studentState.interface';
 
 const initialState: StudentState = {
   students: [],
@@ -27,7 +26,7 @@ export const fetchStudents = createAsyncThunk<Student[], void, { rejectValue: st
       
       const data: Student[] = await response.json();
       return data;
-    } catch (error) {
+    } catch {
       return rejectWithValue('Failed to fetch students');
     }
   }

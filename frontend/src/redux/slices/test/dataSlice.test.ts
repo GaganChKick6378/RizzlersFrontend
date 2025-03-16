@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import dataReducer from './dataSlice'
+import dataReducer from '../dataSlice'
 
 describe('dataSlice', () => {
   it('should handle initial state', () => {
