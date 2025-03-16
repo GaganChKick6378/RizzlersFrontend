@@ -8,7 +8,7 @@ const renderHeader = () => {
   return render(
     <BrowserRouter>
       <IntlProvider messages={{}} locale="en">
-        <Header changeLanguage={() => {}} />
+        <Header/>
       </IntlProvider>
     </BrowserRouter>
   )

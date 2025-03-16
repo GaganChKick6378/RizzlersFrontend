@@ -1,11 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
-import studentReducer from './studentSlice';
-import dataReducer from './dataSlice';
+import dataReducer from './slices/dataSlice';
+import headerReducer from './slices/headerSlice';
 
 export const store = configureStore({
   reducer: {
-    students: studentReducer,
     data: dataReducer,
+    header: headerReducer,
   },
 });
 

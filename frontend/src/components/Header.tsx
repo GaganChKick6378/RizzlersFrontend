@@ -3,12 +3,20 @@ import { useIntl } from 'react-intl';
 import { useNavigate } from 'react-router-dom';
 import Vector from '../assets/Vector.svg';
 import FiGlobe from '../assets/fi_globe.svg';
+import { useDispatch, useSelector } from 'react-redux';
+import { AppDispatch, RootState } from "../redux/store";
+import { setLanguage } from "../redux/slices/headerSlice";
+import { Language } from '@/enums/language.enum';
 
-const Header = ({ changeLanguage }: { changeLanguage: (language: 'en' | 'es' | 'fr' | 'de' | 'it') => void }) => {
+const Header = () => {
+  const dispatch = useDispatch<AppDispatch>();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const intl = useIntl();
   const navigate = useNavigate();
+  
+  // Get current language from Redux
+  const currentLanguage = useSelector((state: RootState) => state.header.language);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -16,15 +24,14 @@ const Header = ({ changeLanguage }: { changeLanguage: (language: 'en' | 'es' | '
         setIsDropdownOpen(false);
       }
     }
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
 
-  const handleLanguageChange = (lang: 'en' | 'es' | 'fr' | 'de' | 'it') => {
-    changeLanguage(lang);
+  const handleLanguageChange = (lang: Language) => {
+    dispatch(setLanguage(lang));
     setIsDropdownOpen(false);
   };
 
@@ -59,11 +66,46 @@ const Header = ({ changeLanguage }: { changeLanguage: (language: 'en' | 'es' | '
           </button>
           {isDropdownOpen && (
             <ul className="absolute bg-white text-black rounded shadow-lg mt-2 w-32 p-2">
-              <li><button onClick={() => handleLanguageChange('en')} className="block py-1 px-3 hover:bg-gray-100 w-full text-left">English</button></li>
-              <li><button onClick={() => handleLanguageChange('es')} className="block py-1 px-3 hover:bg-gray-100 w-full text-left">Español</button></li>
-              <li><button onClick={() => handleLanguageChange('fr')} className="block py-1 px-3 hover:bg-gray-100 w-full text-left">Français</button></li>
-              <li><button onClick={() => handleLanguageChange('de')} className="block py-1 px-3 hover:bg-gray-100 w-full text-left">Deutsch</button></li>
-              <li><button onClick={() => handleLanguageChange('it')} className="block py-1 px-3 hover:bg-gray-100 w-full text-left">Italiano</button></li>
+              <li>
+                <button 
+                  onClick={() => handleLanguageChange(Language.English)} 
+                  className={`block py-1 px-3 hover:bg-gray-100 w-full text-left ${currentLanguage === Language.English ? 'font-bold' : ''}`}
+                >
+                  English
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleLanguageChange(Language.Spanish)} 
+                  className={`block py-1 px-3 hover:bg-gray-100 w-full text-left ${currentLanguage === Language.Spanish ? 'font-bold' : ''}`}
+                >
+                  Español
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleLanguageChange(Language.French)} 
+                  className={`block py-1 px-3 hover:bg-gray-100 w-full text-left ${currentLanguage === Language.French ? 'font-bold' : ''}`}
+                >
+                  Français
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleLanguageChange(Language.German)} 
+                  className={`block py-1 px-3 hover:bg-gray-100 w-full text-left ${currentLanguage === Language.German ? 'font-bold' : ''}`}
+                >
+                  Deutsch
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleLanguageChange(Language.Italian)} 
+                  className={`block py-1 px-3 hover:bg-gray-100 w-full text-left ${currentLanguage === Language.Italian ? 'font-bold' : ''}`}
+                >
+                  Italiano
+                </button>
+              </li>
             </ul>
           )}
         </div>
