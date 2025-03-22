@@ -23,13 +23,13 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true, // Force the specified port
-    proxy: {
-      '/api': {
-        target: 'http://rizzlers-ibe-dev-alb-1534681150.ap-south-1.elb.amazonaws.com',
-        changeOrigin: true,
-        secure: false,
-        rewrite: (path) => path.replace(/^\/api/, '/api')
-      }
-    }
+    // proxy: {
+    //   '/api': {
+    //     target: 'http://rizzlers-ibe-dev-alb-1534681150.ap-south-1.elb.amazonaws.com',
+    //     changeOrigin: true,
+    //     secure: false,
+    //     rewrite: (path) => path.replace(/^\/api/, '/api')
+    //   }
+    // }
   }
 })

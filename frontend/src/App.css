@@ -114,8 +114,105 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
+    margin: 0;
+    padding: 0;
+  }
+  
+  html {
+    overflow-x: hidden;
+    overflow-y: auto;
+    max-width: 100vw;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Calendar custom styles */
+.rdp-custom {
+  --rdp-accent-color: #2f2f2f !important;
+  --rdp-background-color: #eff0f1 !important;
+}
+
+/* Add table layout styles */
+.rdp-custom .rdp-table {
+  width: 100%;
+  border-spacing: 0;
+  border-collapse: separate;
+}
+
+.rdp-custom .rdp-cell {
+  padding: 0;
+  text-align: center;
+  width: 40px;
+  height: 40px;
+}
+
+.rdp-custom .rdp-head_cell {
+  text-align: center;
+  font-weight: 500;
+  height: 40px;
+}
+
+.rdp-custom .rdp-day {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rdp-custom .rdp-button:hover:not([disabled]):not(.rdp-day_selected) {
+  background-color: #eff0f1 !important;
+  color: currentColor !important;
+}
+
+.rdp-custom .rdp-day_selected {
+  background-color: #2f2f2f !important;
+  color: white !important;
+}
+
+.rdp-custom .rdp-day_selected:hover {
+  background-color: #2f2f2f !important;
+}
+
+.rdp-custom .rdp-day_range_start,
+.rdp-custom .rdp-day_range_end {
+  background-color: #2f2f2f !important;
+  color: white !important;
+}
+
+.rdp-custom .rdp-day_range_middle {
+  background-color: #eff0f1 !important;
+  color: currentColor !important;
+}
+
+@media (max-width: 768px) {
+  form.bg-white {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 90% !important;
+    max-width: 380px !important;
+  }
+  
+  .react-day-picker {
+    transform: scale(0.8);
+    transform-origin: top left;
+  }
+}
+
+@media (max-width: 480px) {
+  .react-day-picker {
+    transform: scale(0.6);
   }
 }

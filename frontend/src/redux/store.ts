@@ -1,11 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
-import dataReducer from './slices/dataSlice';
 import headerReducer from './slices/headerSlice';
+import landingConfigReducer from './slices/landingConfigSlice';
 
 export const store = configureStore({
   reducer: {
-    data: dataReducer,
     header: headerReducer,
+    landingConfig: landingConfigReducer,
   },
 });
 

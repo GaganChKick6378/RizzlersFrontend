@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useSelector } from "react-redux";
-import Home from "./pages/Home";
+import { useSelector} from "react-redux";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import MyBookings from "./pages/MyBookings";
+import Home from "./pages/Home";
 import "./utils/sentry";
 
 import { IntlProvider } from "react-intl";
@@ -19,8 +19,6 @@ import itMessages from "./locales/it.json";
 interface MessageFormat {
   language: string;
   text: string;
-  studentsList: string;
-  welcome: string;
   noBooking: string;
   [key: string]: string
 }
@@ -62,7 +60,7 @@ export const AppContent = () => {
     <IntlProvider locale={locale} messages={messages[locale]}>
       <Router>
         <Header />
-        <div className="flex-grow pt-20">
+        <div className="flex-grow">
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/my-bookings" element={<MyBookings />} />

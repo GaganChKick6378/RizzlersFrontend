@@ -1,109 +1,117 @@
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
+import { DatePickerWithRange } from "@/components/ui/DatePickerWithRange";
+import { GuestSelector } from "@/components/ui/GuestSelector";
+import { PropertyData, propertiesData } from "@/data/propertiesData";
 import { useSelector } from "react-redux";
-import { useDispatch } from "react-redux";
-import { AppDispatch } from "../redux/store";
-import { RootState } from "../redux/store";
-import { fetchStudents } from "../redux/slices/dataSlice";
-import { Student } from "@/interfaces/student.interface";
-import ClipLoader from "react-spinners/ClipLoader";
+import { RootState } from "@/redux/store";
+import { Property } from "@/interfaces/landingConfig.interface";
 
-const Home = () => {
-  const dispatch = useDispatch<AppDispatch>();
-  const { students, loading, error } = useSelector(
-    (state: RootState) => state.data
-  );
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 2;
+const Home: React.FC = () => {
+  const [selectedPropertyData, setSelectedPropertyData] = useState<PropertyData | undefined>(undefined);
+  const config = useSelector((state: RootState) => state.landingConfig.config);
 
-  // Pagination calculations
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentStudents = students.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(students.length / itemsPerPage);
-  const pageNumbers = Array.from({ length: totalPages }, (_, i) => i + 1);
+  const handlePropertyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedId = Number(event.target.value);
+    // Get the property data from propertiesData using the selected ID
+    const propertyData = propertiesData[`property${selectedId}`];
+    setSelectedPropertyData(propertyData);
+  };
 
-  useEffect(() => {
-    dispatch(fetchStudents());
-  }, [dispatch]);
-
-  if (loading)
-    return (
-      <div className="flex justify-center items-center min-h-screen w-full">
-        <ClipLoader />
-      </div>
-    );
-  if (error) return <div className="p-4 text-red-600">Error: {error}</div>;
-  if (students.length === 0)
-    return <div className="p-4">No students found.</div>;
+  if (!config) return null;
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="sticky top-0 bg-white shadow-md p-4">
-        <h1 className="text-2xl font-bold text-center text-blue-600">
-          Student Directory
-        </h1>
-      </header>
-      <div className="flex-grow p-4 mt-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="space-y-2 mb-4">
-            {currentStudents.map((student: Student) => (
-              <div
-                key={student.id}
-                className="p-2 border border-gray-300 rounded-md shadow-sm hover:shadow-md transition-shadow"
-              >
-                <h2 className="text-base font-semibold">
-                  {student.firstName} {student.lastName}
-                </h2>
-                <div className="grid grid-cols-2 gap-1 text-sm text-gray-600">
-                  <p>Email: {student.email}</p>
-                  <p>Enrollment: {student.enrollmentNumber}</p>
-                  <p>Department: {student.department}</p>
-                  <p>CGPA: {student.cgpa}</p>
-                  <p className="col-span-2">
-                    Year of Study: {student.yearOfStudy}
-                  </p>
-                </div>
-              </div>
+    <div 
+      className="absolute bg-cover bg-center bg-no-repeat w-full max-w-screen h-[679px] top-[84px] left-1/2 -translate-x-1/2"
+      style={{ backgroundImage: `url(${config.banner_image.url})` }}
+    >
+      <form className="absolute bg-white p-6 rounded shadow border w-[380px] h-[585px] top-[56px] md:left-[78px] left-1/2 md:transform-none -translate-x-1/2 md:-translate-x-0 md:w-[380px] w-[90%]">
+        {/* Property Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Property name*
+          </label>
+          <select
+            className="block w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            onChange={handlePropertyChange}
+            defaultValue=""
+          >
+            <option value="" disabled>Select a property</option>
+            {config.properties.map(property => (
+              <option key={property.id} value={property.id}>
+                {property.property_name}
+              </option>
             ))}
-          </div>
-          <div className="mt-25 bg-white py-3 border-t">
-            <div className="flex justify-center items-center space-x-4 mb-2">
-              <button
-                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
-                disabled={currentPage === totalPages}
-                className="px-4 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 hover:bg-blue-600 transition-colors"
-              >
-                Next
-              </button>
-            </div>
-            <div className="flex justify-center items-center space-x-2">
-              {pageNumbers.map((number) => (
-                <button
-                  key={number}
-                  onClick={() => setCurrentPage(number)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center 
-                    ${
-                      currentPage === number
-                        ? "bg-blue-500 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
-                >
-                  {number}
-                </button>
-              ))}
-            </div>
+          </select>
+        </div>
+
+        {/* Date Selection */}
+        <div className="mb-4">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Select dates
+          </label>
+          <div className="bg-white">
+            <DatePickerWithRange 
+              selectedProperty={selectedPropertyData}
+            />
           </div>
         </div>
-      </div>
+
+        {/* Guests and Rooms */}
+        <div className="mb-4 flex space-x-2">
+          {config.guest_options.show && (
+            <div className="w-1/2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Guests
+              </label>
+              <GuestSelector 
+                onChange={(counts) => {
+                  console.log('Guest counts:', counts);
+                }}
+              />
+            </div>
+          )}
+          
+          {config.room_options.show && (
+            <div className="w-1/2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Rooms
+              </label>
+              <select
+                className="block w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                defaultValue={1}
+              >
+                {Array.from({ length: config.room_options.max_rooms }, (_, i) => i + 1).map((room) => (
+                  <option key={room} value={room}>
+                    {room}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        {/* Accessible Room Checkbox */}
+        {config.accessibility_options.show && (
+          <div className="mb-4 flex items-center">
+            <input
+              type="checkbox"
+              id="accessible-room"
+              className="h-4 w-4 text-[#130739] border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+            />
+            <label htmlFor="accessible-room" className="ml-2 text-sm text-gray-700">
+              I need an Accessible Room
+            </label>
+          </div>
+        )}
+
+        {/* Search Button */}
+        <button
+          type="submit"
+          className="w-1/2 py-2 mt-15 bg-[#130739] text-white font-semibold rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mx-auto block"
+        >
+          SEARCH
+        </button>
+      </form>
     </div>
   );
 };
