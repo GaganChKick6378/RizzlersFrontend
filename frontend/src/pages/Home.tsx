@@ -8,14 +8,29 @@ import { Property } from "@/interfaces/landingConfig.interface";
 
 const Home: React.FC = () => {
   const [selectedPropertyData, setSelectedPropertyData] = useState<PropertyData | undefined>(undefined);
-  const config = useSelector((state: RootState) => state.landingConfig.config);
+  const { config, loading, error } = useSelector((state: RootState) => state.landingConfig);
 
   const handlePropertyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = Number(event.target.value);
-    // Get the property data from propertiesData using the selected ID
     const propertyData = propertiesData[`property${selectedId}`];
     setSelectedPropertyData(propertyData);
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex justify-center items-center h-screen text-red-600">
+        Error: {error}
+      </div>
+    );
+  }
 
   if (!config) return null;
 

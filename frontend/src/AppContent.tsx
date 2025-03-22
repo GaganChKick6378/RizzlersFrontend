@@ -1,10 +1,12 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useSelector} from "react-redux";
+import { useSelector, useDispatch } from "react-redux";
+import { useEffect } from "react";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import MyBookings from "./pages/MyBookings";
 import Home from "./pages/Home";
 import "./utils/sentry";
+import { fetchLandingConfig } from "./redux/slices/landingConfigSlice";
 
 import { IntlProvider } from "react-intl";
 import { RootState } from "./redux/store";
@@ -32,8 +34,13 @@ const messages: Record<string, MessageFormat> = {
 };
 
 export const AppContent = () => {
+  const dispatch = useDispatch();
   const language = useSelector((state: RootState) => state.header.language);
   
+  useEffect(() => {
+    dispatch(fetchLandingConfig(1)); // Fetch config for tenant ID 1 when app loads
+  }, [dispatch]);
+
   let locale: string;
   
   switch (language) {

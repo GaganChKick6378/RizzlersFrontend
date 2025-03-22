@@ -1,14 +1,35 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { LandingConfig } from '@/interfaces/landingConfig.interface';
-import { landingConfigData } from '@/data/landingConfig';
+import axios from 'axios';
 
 interface LandingConfigState {
   config: LandingConfig | null;
+  loading: boolean;
+  error: string | null;
 }
 
 const initialState: LandingConfigState = {
-  config: landingConfigData[1] // Initially load tenant 1's config
+  config: null,
+  loading: false,
+  error: null
 };
+
+export const fetchLandingConfig = createAsyncThunk(
+  'landingConfig/fetchConfig',
+  async (tenantId: number, { rejectWithValue }) => {
+    try {
+      const response = await axios.get<LandingConfig>(
+        `https://uydc3b10re.execute-api.ap-south-1.amazonaws.com/dev/api/tenant-configurations/tenant/${tenantId}/landing`
+      );
+      return response.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        return rejectWithValue(error.message);
+      }
+      return rejectWithValue('Failed to fetch landing config');
+    }
+  }
+);
 
 const landingConfigSlice = createSlice({
   name: 'landingConfig',
@@ -17,6 +38,22 @@ const landingConfigSlice = createSlice({
     setConfig: (state, action: PayloadAction<LandingConfig>) => {
       state.config = action.payload;
     }
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchLandingConfig.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchLandingConfig.fulfilled, (state, action) => {
+        state.loading = false;
+        state.config = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchLandingConfig.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string;
+      });
   }
 });
 

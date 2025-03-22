@@ -89,7 +89,7 @@ const Header = () => {
         <img 
           src={config?.header_logo.url || image1} 
           alt={config?.header_logo.alt || "Logo"}
-          className="w-[103.04px] h-[30px] cursor-pointer ml-4 md:ml-[70px]" 
+          className="w-[103.04px] h-[30px] cursor-pointer ml-4 md:ml-[70px] [filter:brightness(0)_saturate(100%)_invert(8%)_sepia(98%)_saturate(1062%)_hue-rotate(223deg)_brightness(97%)_contrast(88%)]" 
           onClick={() => navigate('/')}
         />
         <span className="text-[#130739] font-lato font-bold text-[20px] leading-[130%] tracking-[0px] md:ml-[5px] md:mt-[2px]">
