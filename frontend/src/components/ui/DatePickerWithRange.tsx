@@ -8,23 +8,35 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { PropertyData } from "@/data/propertiesData"
-import { useSelector } from "react-redux"
+import { useSelector, useDispatch } from "react-redux"
 import { RootState } from "@/redux/store"
+import { fetchDailyRates } from "@/redux/slices/roomRatesSlice"
 
 interface DatePickerWithRangeProps extends React.HTMLAttributes<HTMLDivElement> {
-  selectedProperty?: PropertyData;
+  selectedPropertyId?: number;
 }
 
 export function DatePickerWithRange({
   className,
-  selectedProperty,
+  selectedPropertyId,
 }: DatePickerWithRangeProps) {
-  // Remove default date selection
   const [date, setDate] = React.useState<DateRange | undefined>(undefined);
-
   const [error, setError] = React.useState<string | null>(null);
+  const dispatch = useDispatch();
   const config = useSelector((state: RootState) => state.landingConfig.config);
+  const { rates, loading } = useSelector((state: RootState) => state.roomRates);
+
+  // Fetch rates when property is selected
+  React.useEffect(() => {
+    if (selectedPropertyId) {
+      dispatch(fetchDailyRates({ tenantId: 1, propertyId: selectedPropertyId }));
+    }
+  }, [selectedPropertyId, dispatch]);
+
+  // Convert API dates to Date objects
+  const availableDates = React.useMemo(() => {
+    return rates.map(rate => new Date(rate.date));
+  }, [rates]);
 
   // Generate array of all possible dates for the next year
   const allDates = React.useMemo(() => {
@@ -32,12 +44,6 @@ export function DatePickerWithRange({
     const nextYear = addDays(today, 365);
     return eachDayOfInterval({ start: today, end: nextYear });
   }, []);
-
-  // Get available dates for selected property
-  const availableDates = React.useMemo(() => {
-    if (!selectedProperty?.rates) return [];
-    return selectedProperty.rates.map(rate => new Date(rate.date));
-  }, [selectedProperty]);
 
   const handleSelect = (selectedRange: DateRange | undefined) => {
     if (!selectedRange?.from) {
@@ -100,24 +106,29 @@ export function DatePickerWithRange({
 
   // Function to get price for a specific date
   const getPriceForDate = (date: Date) => {
-    if (!selectedProperty?.rates) return null;
+    if (!rates.length) return null;
     
     const dateStr = format(date, "yyyy-MM-dd");
-    const rateInfo = selectedProperty.rates.find(rate => rate.date === dateStr);
+    const rateInfo = rates.find(rate => rate.date === dateStr);
     
     if (!rateInfo) return null;
 
-    const { minimum_rate, has_promotion, discounted_rate } = rateInfo;
-    if (has_promotion) {
-      return (
-        <div className="text-center text-[10px] mt-1">
-          <span className="line-through text-gray-500">{currency.symbol}{minimum_rate}</span>
-          <br />
-          <span className="text-gray-500">{currency.symbol}{discounted_rate}</span>
-        </div>
-      );
-    }
-    return <div className="text-center text-[10px] text-gray-500 mt-1">{currency.symbol}{minimum_rate}</div>;
+    const { minimum_rate, price_factor } = rateInfo;
+    const discountedPrice = price_factor !== 0 ? minimum_rate - (minimum_rate * price_factor / 100) : null;
+
+    return (
+      <div className="text-center text-[10px] mt-1">
+        {discountedPrice ? (
+          <>
+            <span className="line-through text-gray-500">{currency.symbol}{minimum_rate}</span>
+            <br />
+            <span className="text-gray-500">{currency.symbol}{discountedPrice.toFixed(2)}</span>
+          </>
+        ) : (
+          <span className="text-gray-500">{currency.symbol}{minimum_rate}</span>
+        )}
+      </div>
+    );
   };
 
   const calendarClassName = cn(
@@ -173,7 +184,7 @@ export function DatePickerWithRange({
             disabled={{ 
               before: new Date(),
               after: addDays(new Date(), 365), // Disable dates more than a year ahead
-              dates: selectedProperty ? 
+              dates: selectedPropertyId && availableDates.length > 0 ? 
                 allDates.filter(date => 
                   !availableDates.some(
                     availableDate => 
@@ -199,7 +210,7 @@ export function DatePickerWithRange({
                 {error ? (
                   <div className="text-red-500">{error}</div>
                 ) : (
-                  selectedProperty && date?.from && (
+                  selectedPropertyId && date?.from && (
                     <div>Selected date price: {getPriceForDate(date.from)}</div>
                   )
                 )}
@@ -209,7 +220,7 @@ export function DatePickerWithRange({
               DayContent: ({ date: dayDate }) => (
                 <div className="flex flex-col items-center justify-center w-full h-full">
                   <div className="text-sm">{dayDate.getDate()}</div>
-                  {selectedProperty && getPriceForDate(dayDate)}
+                  {selectedPropertyId && getPriceForDate(dayDate)}
                 </div>
               ),
             }}

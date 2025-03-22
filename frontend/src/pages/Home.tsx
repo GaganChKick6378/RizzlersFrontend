@@ -7,13 +7,12 @@ import { RootState } from "@/redux/store";
 import { Property } from "@/interfaces/landingConfig.interface";
 
 const Home: React.FC = () => {
-  const [selectedPropertyData, setSelectedPropertyData] = useState<PropertyData | undefined>(undefined);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<number | undefined>(undefined);
   const { config, loading, error } = useSelector((state: RootState) => state.landingConfig);
 
   const handlePropertyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedId = Number(event.target.value);
-    const propertyData = propertiesData[`property${selectedId}`];
-    setSelectedPropertyData(propertyData);
+    setSelectedPropertyId(selectedId);
   };
 
   if (loading) {
@@ -66,7 +65,7 @@ const Home: React.FC = () => {
           </label>
           <div className="bg-white">
             <DatePickerWithRange 
-              selectedProperty={selectedPropertyData}
+              selectedPropertyId={selectedPropertyId}
             />
           </div>
         </div>
