@@ -15,6 +15,26 @@ export const fallbackLandingConfig: LandingConfig = {
     alt: "Beach Resort",
     url: ""
   },
+  footer: {
+    desc: "Enjoy your stay at our resort",
+    image: {
+      alt: "Footer Logo",
+      url: ""
+    },
+    copyright: "© 2025 Resort. All rights reserved."
+  },
+  languages: {
+    default: "en",
+    options: [
+      { code: "en", name: "English", active: true }
+    ]
+  },
+  currencies: {
+    default: "USD",
+    options: [
+      { code: "USD", name: "US Dollar", active: true, symbol: "$" }
+    ]
+  },
   length_of_stay: {
     max: 30,
     min: 1,
