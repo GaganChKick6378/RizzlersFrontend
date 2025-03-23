@@ -434,6 +434,11 @@ jobs:
           cache: 'yarn'
           cache-dependency-path: frontend/yarn.lock
 
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          yarn --version
+        
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
