@@ -9,6 +9,9 @@ on:
       - QA
     types: [closed]
 
+env:
+  VITE_API_URL: ${{ secrets.VITE_API_URL_QA }}
+
 jobs:
   # Step 1: Plan the changes without applying them
   terraform-plan:
@@ -262,8 +265,8 @@ jobs:
               
               viewer_protocol_policy = "redirect-to-https"
               min_ttl                = 0
-              default_ttl            = 3600
-              max_ttl                = 86400
+              default_ttl            = 60
+              max_ttl                = 60
             }
             
             restrictions {
@@ -605,6 +608,7 @@ jobs:
         run: npm run build
         env:
           VITE_APP_ENV: ${{ needs.terraform-apply.outputs.environment || 'qa' }}
+          VITE_API_URL: ${{ env.VITE_API_URL }}
           
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
