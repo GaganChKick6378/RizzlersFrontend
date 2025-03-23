@@ -1,12 +1,15 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
-import { useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { useSelector } from "react-redux";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import MyBookings from "./pages/MyBookings";
 import Home from "./pages/Home";
 import "./utils/sentry";
-import { fetchLandingConfig } from "./redux/slices/landingConfigSlice";
 
 import { IntlProvider } from "react-intl";
 import { RootState } from "./redux/store";
@@ -22,7 +25,7 @@ interface MessageFormat {
   language: string;
   text: string;
   noBooking: string;
-  [key: string]: string
+  [key: string]: string;
 }
 
 const messages: Record<string, MessageFormat> = {
@@ -30,50 +33,57 @@ const messages: Record<string, MessageFormat> = {
   es: esMessages,
   fr: frMessages,
   de: deMessages,
-  it: itMessages
+  it: itMessages,
 };
 
 export const AppContent = () => {
-  const dispatch = useDispatch();
   const language = useSelector((state: RootState) => state.header.language);
-  
-  useEffect(() => {
-    dispatch(fetchLandingConfig(1)); // Fetch config for tenant ID 1 when app loads
-  }, [dispatch]);
 
   let locale: string;
-  
+
   switch (language) {
     case Language.English:
-      locale = 'en';
+      locale = "en";
       break;
     case Language.Spanish:
-      locale = 'es';
+      locale = "es";
       break;
     case Language.French:
-      locale = 'fr';
+      locale = "fr";
       break;
     case Language.German:
-      locale = 'de';
+      locale = "de";
       break;
     case Language.Italian:
-      locale = 'it';
+      locale = "it";
       break;
     default:
-      locale = 'en'; 
+      locale = "en";
   }
-  
+
   return (
     <IntlProvider locale={locale} messages={messages[locale]}>
       <Router>
-        <Header />
-        <div className="flex-grow">
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/my-bookings" element={<MyBookings />} />
-          </Routes>
+        <div className="flex flex-col h-screen lg:h-full">
+          <Header />
+          <div className="flex-grow">
+            <Routes>
+              {/* Redirect from root to default tenant ID (1) */}
+              <Route path="/" element={<Navigate to="/1" replace />} />
+
+              {/* Routes with tenant ID parameter */}
+              <Route path="/:tenantId" element={<Home />} />
+              <Route path="/:tenantId/my-bookings" element={<MyBookings />} />
+
+              {/* Legacy route for compatibility */}
+              <Route
+                path="/my-bookings"
+                element={<Navigate to="/1/my-bookings" replace />}
+              />
+            </Routes>
+          </div>
+          <Footer />
         </div>
-        <Footer />
       </Router>
     </IntlProvider>
   );

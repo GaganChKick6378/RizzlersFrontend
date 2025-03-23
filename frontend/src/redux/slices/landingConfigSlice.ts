@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { LandingConfig } from '@/interfaces/landingConfig.interface';
+import { applyLandingConfigDefaults } from '@/utils/configUtils';
 import axios from 'axios';
 
 interface LandingConfigState {
@@ -19,9 +20,10 @@ export const fetchLandingConfig = createAsyncThunk(
   async (tenantId: number, { rejectWithValue }) => {
     try {
       const response = await axios.get<LandingConfig>(
-        `https://uydc3b10re.execute-api.ap-south-1.amazonaws.com/dev/api/tenant-configurations/tenant/${tenantId}/landing`
+        `${import.meta.env.VITE_API_URL}api/tenant-configurations/tenant/${tenantId}/landing`
       );
-      return response.data;
+      // Apply default values to ensure complete data structure
+      return applyLandingConfigDefaults(response.data);
     } catch (error) {
       if (error instanceof Error) {
         return rejectWithValue(error.message);
@@ -36,7 +38,8 @@ const landingConfigSlice = createSlice({
   initialState,
   reducers: {
     setConfig: (state, action: PayloadAction<LandingConfig>) => {
-      state.config = action.payload;
+      // Apply defaults when manually setting config as well
+      state.config = applyLandingConfigDefaults(action.payload);
     }
   },
   extraReducers: (builder) => {

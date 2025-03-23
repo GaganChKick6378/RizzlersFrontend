@@ -1,18 +1,47 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
+import { useParams } from "react-router-dom";
+
 import { DatePickerWithRange } from "@/components/ui/DatePickerWithRange";
+import { Checkbox } from "@/components/ui/checkbox";
 import { GuestSelector } from "@/components/ui/GuestSelector";
-import { PropertyData, propertiesData } from "@/data/propertiesData";
-import { useSelector } from "react-redux";
-import { RootState } from "@/redux/store";
-import { Property } from "@/interfaces/landingConfig.interface";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+import { useSelector, useDispatch } from "react-redux";
+import { RootState, AppDispatch } from "@/redux/store";
+
+import { PiWheelchairBold } from "react-icons/pi";
+
+import { setSelectedPropertyId } from "../redux/slices/roomRatesSlice";
+import { fetchLandingConfig } from "../redux/slices/landingConfigSlice";
 
 const Home: React.FC = () => {
-  const [selectedPropertyId, setSelectedPropertyId] = useState<number | undefined>(undefined);
-  const { config, loading, error } = useSelector((state: RootState) => state.landingConfig);
+  const { tenantId = "1" } = useParams<{ tenantId: string }>();
+  const { config, loading, error } = useSelector(
+    (state: RootState) => state.landingConfig
+  );
+  const { selectedPropertyId } = useSelector(
+    (state: RootState) => state.roomRates
+  );
+  const dispatch = useDispatch<AppDispatch>();
 
-  const handlePropertyChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedId = Number(event.target.value);
-    setSelectedPropertyId(selectedId);
+  // Fetch config when tenant ID changes
+  useEffect(() => {
+    const numericTenantId = parseInt(tenantId, 10);
+    if (!isNaN(numericTenantId)) {
+      dispatch(fetchLandingConfig(numericTenantId));
+    }
+  }, [tenantId, dispatch]);
+
+  const handlePropertyChange = (value: string) => {
+    const selectedId = Number(value);
+    dispatch(setSelectedPropertyId(selectedId));
   };
 
   if (loading) {
@@ -33,95 +62,197 @@ const Home: React.FC = () => {
 
   if (!config) return null;
 
+  // Banner image - only show if available
+  const bannerStyle = config?.banner_image?.url
+    ? { backgroundImage: `url(${config.banner_image.url})` }
+    : { backgroundColor: "#f5f5f5" }; // Fallback background color
+
   return (
-    <div 
-      className="absolute bg-cover bg-center bg-no-repeat w-full max-w-screen h-[679px] top-[84px] left-1/2 -translate-x-1/2"
-      style={{ backgroundImage: `url(${config.banner_image.url})` }}
+    <div
+      className="absolute bg-cover bg-center bg-no-repeat w-screen h-[42.4375rem] top-[84px] left-1/2 -translate-x-1/2"
+      style={bannerStyle}
     >
-      <form className="absolute bg-white p-6 rounded shadow border w-[380px] h-[585px] top-[56px] md:left-[78px] left-1/2 md:transform-none -translate-x-1/2 md:-translate-x-0 md:w-[380px] w-[90%]">
-        {/* Property Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Property name*
-          </label>
-          <select
-            className="block w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            onChange={handlePropertyChange}
-            defaultValue=""
-          >
-            <option value="" disabled>Select a property</option>
-            {config.properties.map(property => (
-              <option key={property.id} value={property.id}>
-                {property.property_name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Date Selection */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Select dates
-          </label>
-          <div className="bg-white">
-            <DatePickerWithRange 
-              selectedPropertyId={selectedPropertyId}
-            />
-          </div>
-        </div>
-
-        {/* Guests and Rooms */}
-        <div className="mb-4 flex space-x-2">
-          {config.guest_options.show && (
-            <div className="w-1/2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Guests
-              </label>
-              <GuestSelector 
-                onChange={(counts) => {
-                  console.log('Guest counts:', counts);
-                }}
-              />
-            </div>
-          )}
-          
-          {config.room_options.show && (
-            <div className="w-1/2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Rooms
-              </label>
-              <select
-                className="block w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                defaultValue={1}
-              >
-                {Array.from({ length: config.room_options.max_rooms }, (_, i) => i + 1).map((room) => (
-                  <option key={room} value={room}>
-                    {room}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Accessible Room Checkbox */}
-        {config.accessibility_options.show && (
-          <div className="mb-4 flex items-center">
-            <input
-              type="checkbox"
-              id="accessible-room"
-              className="h-4 w-4 text-[#130739] border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-            />
-            <label htmlFor="accessible-room" className="ml-2 text-sm text-gray-700">
-              I need an Accessible Room
+      <form className="absolute bg-white pl-[2.75rem] pr-[2.75rem] pt-[3.375rem] rounded-[0.3125rem] w-[23.75rem] h-[36.5625rem] top-[3.5rem] md:left-[78px] left-1/2 md:w-[23.75rem]">
+        {/* Property Selection - only render if properties exist */}
+        {config?.properties && config.properties.length > 0 && (
+          <div className="mb-4">
+            <label className="block text-sm font-400 mb-1 text-[#2F2F2F]">
+              Property name*
             </label>
+            <Select
+              onValueChange={handlePropertyChange}
+              value={selectedPropertyId?.toString() || undefined}
+            >
+              <SelectTrigger
+                className="w-full px-[1.1875rem] py-[0.75rem] !h-[3rem] text-[#5D5D5D] font-extralight rounded-[0.25rem] border border-gray-300"
+                style={{ height: "3rem" }}
+              >
+                {!selectedPropertyId && <p>Select Property</p>}
+                {selectedPropertyId && (
+                  <span>
+                    {config.properties.find(
+                      (property) => property.id === selectedPropertyId
+                    )?.property_name || "Property not found"}
+                  </span>
+                )}
+              </SelectTrigger>
+              <SelectContent className="text-[#5D5D5D] w-[18.25rem]">
+                <SelectGroup>
+                  {config.properties.map((property) => {
+                    const isDisabled = !property.is_assigned;
+                    return (
+                      <SelectItem
+                        key={property.id}
+                        value={property.id.toString()}
+                        disabled={isDisabled}
+                        className={`text-[#5D5D5D] flex items-center gap-2 ${
+                          isDisabled ? "disabled" : ""
+                        }`}
+                      >
+                        <div
+                          className={`flex items-center space-x-2 w-full ${
+                            isDisabled ? "opacity-70" : ""
+                          }`}
+                        >
+                          <Checkbox
+                            id={`property-${property.id}`}
+                            checked={selectedPropertyId === property.id}
+                            disabled={isDisabled}
+                            className="mr-2 data-[state=checked]:bg-[#26266D] text-white data-[state=checked]:text-white border-[#C1C2C2]"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (!isDisabled) {
+                                dispatch(setSelectedPropertyId(property.id));
+                              }
+                            }}
+                          />
+                          <span>{property.property_name}</span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </div>
         )}
 
-        {/* Search Button */}
+        {/* Date Selection - only render if length_of_stay is available */}
+        {config?.length_of_stay && (
+          <div className="mb-4">
+            <label className="block text-sm font-400 text-[#2F2F2F] mb-1">
+              Select dates
+            </label>
+            <div className="bg-white">
+              <DatePickerWithRange />
+            </div>
+          </div>
+        )}
+
+        {/* Guests and Rooms Section */}
+        {(config?.guest_options?.show || config?.room_options?.show) && (
+          <div className="mb-4 flex justify-between">
+            {/* Guest Selector - only if enabled in config */}
+            {config?.guest_options?.show &&
+              config?.guest_types &&
+              config.guest_types.length > 0 && (
+                <div
+                  className={
+                    config?.room_options?.show ? "w-[12.5rem]" : "w-full"
+                  }
+                >
+                  <label className="block text-sm font-400 text-[#2F2F2F] mb-1">
+                    Guests
+                  </label>
+                  <GuestSelector
+                    onChange={(counts) => {
+                      console.log("Guest counts:", counts);
+                    }}
+                  />
+                </div>
+              )}
+
+            {/* Room Selection - only if enabled in config */}
+            {config?.room_options?.show &&
+              config?.room_options?.max_rooms > 0 && (
+                <div
+                  className={
+                    config?.guest_options?.show ? "w-[4.8125rem]" : "w-full"
+                  }
+                >
+                  <label className="block text-sm font-400 text-[#2F2F2F] mb-1">
+                    Rooms
+                  </label>
+                  <Select defaultValue="1">
+                    <SelectTrigger
+                      className="w-full px-[1.1875rem] py-[0.75rem] !h-[3rem] text-[#858685] rounded-[0.25rem] border border-gray-300"
+                      style={{ height: "3rem" }}
+                    >
+                      <SelectValue
+                        placeholder="1"
+                        style={{
+                          fontStyle: "italic",
+                          color: "#858685",
+                          fontWeight: "normal",
+                        }}
+                      />
+                    </SelectTrigger>
+                    <SelectContent
+                      className="text-[#858685] !w-[4.8125rem]"
+                      style={{
+                        width: "4.8125rem !important",
+                        minWidth: "4.8125rem !important",
+                      }}
+                    >
+                      <SelectGroup>
+                        {Array.from(
+                          { length: config.room_options.max_rooms },
+                          (_, i) => i + 1
+                        ).map((room) => (
+                          <SelectItem
+                            key={room}
+                            value={room.toString()}
+                            className="text-[#858685]"
+                          >
+                            {room}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+          </div>
+        )}
+
+        {/* Accessible Room Checkbox - only if enabled in config */}
+        {config?.accessibility_options?.show &&
+          config?.accessibility_options?.options &&
+          config.accessibility_options.options.length > 0 && (
+            <div className="mb-4 flex items-center gap-1">
+              <input
+                type="checkbox"
+                id="accessible-room"
+                className="h-4 w-4 text-[#130739] border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+              />
+              <label
+                htmlFor="accessible-room"
+                className="text-[0.875rem] text-[#2F2F2F] flex items-center gap-1 font-400"
+              >
+                <PiWheelchairBold /> <span> I need an Accessible Room</span>
+              </label>
+            </div>
+          )}
+
+        {/* Search Button - always displayed */}
         <button
           type="submit"
-          className="w-1/2 py-2 mt-15 bg-[#130739] text-white font-semibold rounded hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 mx-auto block"
+          className={`w-[8.75rem] h-[2.75rem] py-2 mt-28 bg-[#26266D] text-white font-semibold rounded focus:outline-none focus:ring-2 mx-auto block ${
+            !selectedPropertyId
+              ? "opacity-50 cursor-not-allowed"
+              : "cursor-pointer"
+          }`}
+          disabled={!selectedPropertyId}
         >
           SEARCH
         </button>

@@ -17,6 +17,28 @@ export interface Property {
   is_assigned: boolean;
 }
 
+export interface Language {
+  code: string;
+  name: string;
+  active: boolean;
+}
+
+export interface Currency {
+  code: string;
+  name: string;
+  active: boolean;
+  symbol: string;
+}
+
+export interface FooterConfig {
+  desc: string;
+  image: {
+    alt: string;
+    url: string;
+  };
+  copyright: string;
+}
+
 export interface LandingConfig {
   tenantId: number;
   page: string;
@@ -30,6 +52,15 @@ export interface LandingConfig {
   banner_image: {
     alt: string;
     url: string;
+  };
+  footer: FooterConfig;
+  languages: {
+    default: string;
+    options: Language[];
+  };
+  currencies: {
+    default: string;
+    options: Currency[];
   };
   length_of_stay: {
     max: number;

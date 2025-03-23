@@ -1,8 +1,13 @@
-import { useState } from 'react';
-import { Button } from './button';
-import { Popover, PopoverContent, PopoverTrigger } from './popover';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/redux/store';
+import { 
+  Select,
+  SelectContent,
+  SelectTrigger,
+  SelectValue,
+} from './select';
+import { Button } from './button';
 
 interface GuestCount {
   [key: string]: number;
@@ -14,15 +19,24 @@ interface GuestSelectorProps {
 
 export function GuestSelector({ onChange }: GuestSelectorProps) {
   const config = useSelector((state: RootState) => state.landingConfig.config);
-  const [counts, setCounts] = useState<GuestCount>(
-    config?.guest_types.reduce((acc, type) => ({
-      ...acc,
-      [type.guestType]: 0
-    }), {}) || {}
-  );
+  const [counts, setCounts] = useState<GuestCount>({});
+  
+  // Initialize guest counts when config is loaded
+  useEffect(() => {
+    if (config?.guest_types) {
+      setCounts(
+        config.guest_types.reduce((acc, type) => ({
+          ...acc,
+          [type.guestType]: 0
+        }), {})
+      );
+    }
+  }, [config?.guest_types]);
 
   const handleChange = (type: string, increment: boolean) => {
-    const guestType = config?.guest_types.find(gt => gt.guestType === type);
+    if (!config?.guest_types) return;
+    
+    const guestType = config.guest_types.find(gt => gt.guestType === type);
     if (!guestType) return;
 
     const newCounts = { ...counts };
@@ -37,44 +51,61 @@ export function GuestSelector({ onChange }: GuestSelectorProps) {
 
   const totalGuests = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
-  if (!config) return null;
+  // If config or guest_types aren't available, don't render
+  if (!config?.guest_types || !config.guest_options?.show) return null;
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-full px-3 py-2 text-left border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-indigo-500 h-[42px] bg-white hover:bg-white text-gray-900 font-normal text-sm"
-        >
-          {totalGuests} Guest{totalGuests !== 1 ? 's' : ''}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-48 p-3">
-        {config?.guest_types.map((guestType) => (
-          <div key={guestType.id} className="flex items-center justify-between py-2">
-            <span className="text-sm text-gray-700">{guestType.description}</span>
+    <Select>
+      <SelectTrigger 
+        className="w-full px-[1.1875rem] py-[0.75rem] !h-[3rem] text-[#858685] rounded-[0.25rem] border border-gray-300"
+        style={{ height: '3rem' }}
+      >
+        <SelectValue 
+          placeholder={totalGuests > 0 ? `${totalGuests} Guest${totalGuests !== 1 ? 's' : ''}` : "Guests"} 
+          style={{ 
+            fontStyle: 'italic',
+            color: '#2F2F2F', 
+            fontWeight: 'normal'
+          }}
+        />
+      </SelectTrigger>
+      <SelectContent>
+        {config.guest_types.map((guestType) => (
+          <div key={guestType.id} className="flex items-center justify-between py-2 px-3 w-[18.25rem]">
+            <div className="flex flex-col">
+              <span className="text-sm font-medium text-[#2F2F2F]">
+                {guestType.guestType}
+              </span>
+              {guestType.description && (
+                <span className="text-xs text-[#858685]">
+                  {guestType.description}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <Button
                 type="button"
                 variant="ghost"
                 className="h-6 w-6 p-0 hover:bg-transparent"
                 onClick={() => handleChange(guestType.guestType, false)}
+                disabled={!counts[guestType.guestType]}
               >
                 -
               </Button>
-              <span className="w-4 text-center">{counts[guestType.guestType]}</span>
+              <span className="w-4 text-center">{counts[guestType.guestType] || 0}</span>
               <Button
                 type="button"
                 variant="ghost"
                 className="h-6 w-6 p-0 hover:bg-transparent"
                 onClick={() => handleChange(guestType.guestType, true)}
+                disabled={counts[guestType.guestType] >= (guestType.maxCount || 0)}
               >
                 +
               </Button>
             </div>
           </div>
         ))}
-      </PopoverContent>
-    </Popover>
+      </SelectContent>
+    </Select>
   );
 }
