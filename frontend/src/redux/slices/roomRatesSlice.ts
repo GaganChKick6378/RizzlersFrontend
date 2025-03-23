@@ -15,7 +15,7 @@ export const fetchDailyRates = createAsyncThunk(
   async ({ tenantId, propertyId }: { tenantId: number; propertyId: number }, { rejectWithValue }) => {
     try {
       const response = await axios.get<DailyRate[]>(
-        `${import.meta.env.VITE_API_URL}api/room-rates/daily-rates?tenantId=${tenantId}&propertyId=${propertyId}`
+        `https://uydc3b10re.execute-api.ap-south-1.amazonaws.com/dev/api/room-rates/daily-rates?tenantId=${tenantId}&propertyId=${propertyId}`
       );
       return response.data;
     } catch (error) {

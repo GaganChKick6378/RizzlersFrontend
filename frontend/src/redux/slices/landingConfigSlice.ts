@@ -20,7 +20,7 @@ export const fetchLandingConfig = createAsyncThunk(
   async (tenantId: number, { rejectWithValue }) => {
     try {
       const response = await axios.get<LandingConfig>(
-        `${import.meta.env.VITE_API_URL}api/tenant-configurations/tenant/${tenantId}/landing`
+        `https://uydc3b10re.execute-api.ap-south-1.amazonaws.com/dev/api/tenant-configurations/tenant/${tenantId}/landing`
       );
       // Apply default values to ensure complete data structure
       return applyLandingConfigDefaults(response.data);

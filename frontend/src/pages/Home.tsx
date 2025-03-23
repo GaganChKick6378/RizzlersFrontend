@@ -20,6 +20,7 @@ import { PiWheelchairBold } from "react-icons/pi";
 
 import { setSelectedPropertyId } from "../redux/slices/roomRatesSlice";
 import { fetchLandingConfig } from "../redux/slices/landingConfigSlice";
+import { detectUserCurrency } from "../redux/slices/currencySlice";
 
 const Home: React.FC = () => {
   const { tenantId = "1" } = useParams<{ tenantId: string }>();
@@ -29,6 +30,8 @@ const Home: React.FC = () => {
   const { selectedPropertyId } = useSelector(
     (state: RootState) => state.roomRates
   );
+  // selectedCurrency will be used for price conversion in the UI
+  
   const dispatch = useDispatch<AppDispatch>();
 
   // Fetch config when tenant ID changes
@@ -38,6 +41,20 @@ const Home: React.FC = () => {
       dispatch(fetchLandingConfig(numericTenantId));
     }
   }, [tenantId, dispatch]);
+
+  // Detect user's currency after config is loaded
+  useEffect(() => {
+    if (config && config.currencies?.options && config.languages?.options) {
+      // Detect user's currency and language based on browser locale
+      dispatch(detectUserCurrency());
+      
+      // Log for debugging
+      console.log('Detecting user locale, language and currency...');
+      console.log('Browser language:', navigator.language);
+      console.log('Available currencies:', config.currencies.options);
+      console.log('Available languages:', config.languages.options);
+    }
+  }, [config, dispatch]);
 
   const handlePropertyChange = (value: string) => {
     const selectedId = Number(value);

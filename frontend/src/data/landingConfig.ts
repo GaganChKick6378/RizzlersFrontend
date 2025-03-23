@@ -16,23 +16,43 @@ export const fallbackLandingConfig: LandingConfig = {
     url: ""
   },
   footer: {
-    desc: "Enjoy your stay at our resort",
+    desc: "Welcome to our resort",
     image: {
       alt: "Footer Logo",
       url: ""
     },
-    copyright: "© 2025 Resort. All rights reserved."
+    copyright: "© 2023 Resort. All rights reserved."
   },
   languages: {
     default: "en",
     options: [
-      { code: "en", name: "English", active: true }
+      {
+        code: "en",
+        name: "English",
+        active: true
+      },
+      {
+        code: "es",
+        name: "Spanish",
+        active: false
+      }
     ]
   },
   currencies: {
     default: "USD",
     options: [
-      { code: "USD", name: "US Dollar", active: true, symbol: "$" }
+      {
+        code: "USD",
+        name: "US Dollar",
+        active: true,
+        symbol: "$"
+      },
+      {
+        code: "EUR",
+        name: "Euro",
+        active: false,
+        symbol: "€"
+      }
     ]
   },
   length_of_stay: {
