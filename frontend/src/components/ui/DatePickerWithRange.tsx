@@ -32,6 +32,7 @@ export function DatePickerWithRange({
   // Get data from Redux store
   const { config } = useSelector((state: RootState) => state.landingConfig);
   const { rates, selectedDateRange, selectedPropertyId, loading } = useSelector((state: RootState) => state.roomRates);
+  const { selectedCurrency } = useSelector((state: RootState) => state.currency);
   
   const maxStayDuration = config?.length_of_stay?.max || 14; // Default to 14 if not available
   const minStayDuration = config?.length_of_stay?.min || 1; // Default to 1 if not available
@@ -104,6 +105,28 @@ export function DatePickerWithRange({
     setCurrentMonth((prev) => addMonths(prev, 1));
   };
   
+  // Simple price conversion based on an exchange rate
+  // In a real app, you would get this rate from the currency slice
+  const getConvertedPrice = (price: number): number => {
+    if (!selectedCurrency || selectedCurrency.code === 'USD') {
+      return price;
+    }
+    
+    // This is a placeholder - in a real app you'd use actual exchange rates
+    // from your Redux store
+    const exchangeRates: Record<string, number> = {
+      'EUR': 0.85,
+      'GBP': 0.75,
+      'INR': 83.0,
+      'CAD': 1.35,
+      'AUD': 1.45,
+      // Add more currencies as needed
+    };
+    
+    const rate = exchangeRates[selectedCurrency.code] || 1;
+    return price * rate;
+  };
+
   // Function to get price for a specific date
   const getPriceForDate = (day: Date): DailyRate | null => {
     // Make sure rates is an array before using find()
@@ -115,30 +138,29 @@ export function DatePickerWithRange({
   
   // Custom day content renderer - separated from the Day component
   const renderDayContents = (day: Date) => {
-    const rateInfo = getPriceForDate(day);
-    const isRangeEnd = selectedDateRange?.from && selectedDateRange?.to && 
-      (day.getTime() === selectedDateRange.from.getTime() || day.getTime() === selectedDateRange.to.getTime());
+    const dailyRate = getPriceForDate(day);
+    
+    let displayPrice = null;
+    
+    if (dailyRate?.discounted_rate) {
+      // Convert price according to selected currency
+      const convertedPrice = getConvertedPrice(dailyRate.discounted_rate);
+      
+      // Format with currency symbol
+      displayPrice = selectedCurrency 
+        ? `${selectedCurrency.symbol}${convertedPrice.toFixed(2)}`
+        : `$${convertedPrice.toFixed(2)}`;
+    }
     
     return (
-      <>
+      <div className="flex flex-col items-center justify-center h-full">
         <div>{format(day, "d")}</div>
-        {loading ? (
-          <div className="text-xs mt-1 text-gray-400">...</div>
-        ) : rateInfo !== null ? (
-          <div className={`text-xs mt-1 font-medium ${isRangeEnd ? 'text-white' : ''}`}>
-            {rateInfo.has_promotion ? (
-              <>
-                <div className={`line-through text-xs ${isRangeEnd ? 'text-white opacity-70' : 'text-gray-400'}`}>
-                  ${rateInfo.minimum_rate}
-                </div>
-                <div>${rateInfo.discounted_rate}</div>
-              </>
-            ) : (
-              <div>${rateInfo.minimum_rate}</div>
-            )}
+        {displayPrice && (
+          <div className="text-xs">
+            {displayPrice}
           </div>
-        ) : null}
-      </>
+        )}
+      </div>
     );
   };
 
@@ -147,27 +169,28 @@ export function DatePickerWithRange({
     setOpen(false);
   };
 
-  // Function to calculate the total price for the selected date range
+  // Update calculateTotalPrice to use currency conversion
   const calculateTotalPrice = (): number | null => {
-    if (!selectedDateRange?.from || !selectedDateRange?.to || !Array.isArray(rates)) return null;
-    
-    let totalPrice = 0;
-    const startDate = new Date(selectedDateRange.from);
-    const endDate = new Date(selectedDateRange.to);
-    
-    // Loop through each day in the range
-    const daysCount = differenceInDays(endDate, startDate) + 1;
-    for (let i = 0; i < daysCount; i++) {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(startDate.getDate() + i);
-      
-      const rateInfo = getPriceForDate(currentDate);
-      if (rateInfo) {
-        totalPrice += rateInfo.discounted_rate;
-      }
+    if (!selectedDateRange?.from || !selectedDateRange?.to) {
+      return null;
     }
     
-    return totalPrice;
+    let totalPrice = 0;
+    const currentDate = new Date(selectedDateRange.from);
+    const endDate = new Date(selectedDateRange.to);
+    
+    while (currentDate <= endDate) {
+      const dailyRate = getPriceForDate(currentDate);
+      
+      if (dailyRate?.discounted_rate) {
+        totalPrice += dailyRate.discounted_rate;
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Convert the total price according to selected currency
+    return getConvertedPrice(totalPrice);
   };
 
   const totalPrice = calculateTotalPrice();
@@ -202,6 +225,12 @@ export function DatePickerWithRange({
                     <span className="mx-1">→</span>
                     <span>{selectedDateRange?.to ? format(selectedDateRange.to, "MMM d, yyyy") : "Check-out"}</span>
                     
+                    {/* Display total price if dates selected */}
+                    {selectedDateRange?.from && selectedDateRange?.to && totalPrice !== null && (
+                      <span className="ml-4 text-[#26266D] font-semibold">
+                        {selectedCurrency ? `${selectedCurrency.symbol}${totalPrice.toFixed(2)}` : `$${totalPrice.toFixed(2)}`}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -318,7 +347,7 @@ export function DatePickerWithRange({
                   <span className="text-gray-600 font-medium">Calculating total price...</span>
                 ) : totalPrice !== null ? (
                   <span className="text-[#26266D] font-semibold text-lg">
-                    Total: ${totalPrice.toFixed(2)}
+                    Total: {selectedCurrency ? `${selectedCurrency.symbol}${totalPrice.toFixed(2)}` : `$${totalPrice.toFixed(2)}`}
                   </span>
                 ) : (
                   <span className="text-red-500 font-medium">Unable to calculate price</span>
@@ -331,7 +360,7 @@ export function DatePickerWithRange({
               onClick={handleApplyDates}
             >
               {selectedDateRange?.from && selectedDateRange?.to && !loading && totalPrice !== null 
-                ? `APPLY - $${totalPrice.toFixed(2)}`
+                ? `APPLY - ${selectedCurrency ? `${selectedCurrency.symbol}${totalPrice.toFixed(2)}` : `$${totalPrice.toFixed(2)}`}`
                 : "APPLY DATES"
               }
             </Button>
