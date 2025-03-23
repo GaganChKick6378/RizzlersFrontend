@@ -31,9 +31,7 @@ const Home: React.FC = () => {
     (state: RootState) => state.roomRates
   );
   // selectedCurrency will be used for price conversion in the UI
-  const { selectedCurrency } = useSelector(
-    (state: RootState) => state.currency
-  );
+  
   const dispatch = useDispatch<AppDispatch>();
 
   // Fetch config when tenant ID changes
