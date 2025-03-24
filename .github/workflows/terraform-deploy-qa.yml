@@ -646,11 +646,23 @@ jobs:
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build Frontend
-        run: yarn build
+      - name: Build the QA Frontend
+        run: |
+          # Create a temporary .env.sentry-build-plugin file with Sentry configuration
+          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" > .env.sentry-build-plugin
+          echo "SENTRY_ORG=${{ secrets.SENTRY_ORG }}" >> .env.sentry-build-plugin
+          echo "SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}" >> .env.sentry-build-plugin
+          
+          # Create or update the config/.env.qa.anv file
+          mkdir -p config
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL_QA }}" > config/.env.qa.anv
+          echo "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}" >> config/.env.qa.anv
+          
+          # Run the qa-specific build
+          yarn qa:build
         env:
           VITE_APP_ENV: ${{ needs.terraform-apply.outputs.environment || 'qa' }}
-          VITE_API_URL: ${{ env.VITE_API_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL_QA }}
           
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
