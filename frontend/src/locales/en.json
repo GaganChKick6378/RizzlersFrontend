@@ -1,8 +1,5 @@
 {
     "language": "En",
-    "text":"Internet Booking Engine", 
-    "studentsList": "Students List",
-    "welcome": "Welcome to Kickdrum!",
+    "text": "Internet Booking Engine",
     "noBooking": "no booking"
-  }
-  
+}

@@ -430,12 +430,17 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
 
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          yarn --version
+        
       - name: Install Dependencies
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Build Frontend for Dev Environment
         run: |
@@ -450,7 +455,7 @@ jobs:
           echo "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}" >> config/.env.dev.anv
           
           # Run the dev-specific build
-          npm run dev:build
+          yarn dev:build
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
