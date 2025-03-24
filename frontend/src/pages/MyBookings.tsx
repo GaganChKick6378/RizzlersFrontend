@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { AppDispatch } from '@/redux/store';
 import { fetchLandingConfig } from '../redux/slices/landingConfigSlice';
-import { Button } from '@/components/ui/button';
+import { Button } from '../components/ui/button';
 
 const MyBookings = () => {
   const intl = useIntl();

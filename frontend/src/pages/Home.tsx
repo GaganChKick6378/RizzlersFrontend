@@ -20,7 +20,7 @@ import { PiWheelchairBold } from "react-icons/pi";
 
 import { setSelectedPropertyId } from "../redux/slices/roomRatesSlice";
 import { fetchLandingConfig } from "../redux/slices/landingConfigSlice";
-import { detectUserCurrency } from "../redux/slices/currencySlice";
+
 
 const Home: React.FC = () => {
   const { tenantId = "1" } = useParams<{ tenantId: string }>();
@@ -46,7 +46,6 @@ const Home: React.FC = () => {
   useEffect(() => {
     if (config && config.currencies?.options && config.languages?.options) {
       // Detect user's currency and language based on browser locale
-      dispatch(detectUserCurrency());
       
       // Log for debugging
       console.log('Detecting user locale, language and currency...');

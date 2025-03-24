@@ -5,7 +5,6 @@ import {
   Navigate,
 } from "react-router-dom";
 import { useSelector } from "react-redux";
-import Header from "./components/Header";
 import Footer from "./components/Footer";
 import MyBookings from "./pages/MyBookings";
 import Home from "./pages/Home";
@@ -20,6 +19,7 @@ import esMessages from "./locales/es.json";
 import frMessages from "./locales/fr.json";
 import deMessages from "./locales/de.json";
 import itMessages from "./locales/it.json";
+import WrappedHeader from "./components/Header";
 
 interface MessageFormat {
   language: string;
@@ -65,7 +65,7 @@ export const AppContent = () => {
     <IntlProvider locale={locale} messages={messages[locale]}>
       <Router>
         <div className="flex flex-col h-screen lg:h-full">
-          <Header />
+          <WrappedHeader />
           <div className="flex-grow">
             <Routes>
               {/* Redirect from root to default tenant ID (1) */}

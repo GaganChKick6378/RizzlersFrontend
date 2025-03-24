@@ -7,7 +7,9 @@ const App = () => {
   return (
     <div className="site-container">
       <Provider store={store}>
-        <AppContent />
+        
+          <AppContent />
+       
       </Provider>
     </div>
   );
