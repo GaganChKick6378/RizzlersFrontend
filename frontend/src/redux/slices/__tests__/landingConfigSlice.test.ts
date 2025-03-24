@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import reducer, { fetchLandingConfig, setConfig } from '../landingConfigSlice';
 import { defaultLandingConfig } from '@/utils/configUtils';
-import axios from 'axios';
 
 vi.mock('axios');
 

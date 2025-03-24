@@ -22,7 +22,7 @@ vi.mock('react-intl', async () => {
   return {
     ...actual,
     useIntl: () => ({
-      formatMessage: ({ id }) => id,
+      formatMessage: ({ id }: { id: string }) => id,
     }),
   };
 });

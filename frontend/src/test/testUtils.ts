@@ -3,7 +3,7 @@ import { configureStore } from '@reduxjs/toolkit';
 export const createTestStore = (initialState = {}) => {
   return configureStore({
     reducer: {
-      landingConfig: (state = { loading: false, error: null, config: null }, action) => state,
+      landingConfig: (state = { loading: false, error: null, config: null }) => state,
       header: (state = { currency: { code: 'USD', symbol: '$' }, language: 'en' }) => state,
     },
     middleware: (getDefaultMiddleware) => getDefaultMiddleware(),

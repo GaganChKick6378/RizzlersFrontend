@@ -10,7 +10,7 @@ import { fetchLandingConfig } from '../../redux/slices/landingConfigSlice';
 // Mock store setup
 const mockStore = configureStore({
   reducer: {
-    landingConfig: (state = { loading: false, error: null, config: null }, action) => state
+    landingConfig: (state = { loading: false, error: null, config: null }) => state
   },
   middleware: (getDefaultMiddleware) => getDefaultMiddleware()
 });
