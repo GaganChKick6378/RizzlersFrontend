@@ -4,16 +4,22 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import FiGlobe from "../assets/fi_globe.svg";
 import { useDispatch, useSelector } from "react-redux";
 import { RootState, AppDispatch } from "../redux/store";
-import { setCurrency, setLanguage, fetchCurrencyRate } from "../redux/slices/headerSlice";
+import { setCurrency, setLanguage as setLanguageAction, fetchCurrencyRate } from "../redux/slices/headerSlice";
 import { detectUserLocation } from "../redux/slices/locationSlice";
 import { Language } from "@/enums/language.enum";
 
+const googleTranslateLanguageMap: Record<string, string> = {
+  "EN": "en",
+  "ES": "es",
+  "FR": "fr",
+  "DE": "de",
+  "IT": "it",
+};
+
 const Header = () => {
-  // Extract tenant ID from URL parameters or use default
   const params = useParams<{ tenantId?: string }>();
   const location = useLocation();
 
-  // Get tenant ID from path if not available in params
   const getTenantIdFromPath = () => {
     if (params.tenantId) return params.tenantId;
 
@@ -21,7 +27,7 @@ const Header = () => {
     if (pathParts.length > 1 && !isNaN(Number(pathParts[1]))) {
       return pathParts[1];
     }
-    return "1"; // Default tenant ID
+    return "1"; 
   };
 
   const currentTenantId = getTenantIdFromPath();
@@ -40,7 +46,6 @@ const Header = () => {
   const config = useSelector((state: RootState) => state.landingConfig.config);
   const { country, currency: detectedCurrency, detected } = useSelector((state: RootState) => state.location);
 
-  // Detect user's location based on IP
   useEffect(() => {
     dispatch(detectUserLocation());
   }, [dispatch]);
@@ -126,12 +131,39 @@ const Header = () => {
   const toggleCurrencyDropdown = () =>
     setIsCurrencyDropdownOpen(!isCurrencyDropdownOpen);
 
+  // Helper function to use Google Translate
+  const translateWithGoogleTranslate = (langCode: string) => {
+    const googleLangCode = googleTranslateLanguageMap[langCode.toUpperCase()];
+    if (googleLangCode) {
+      // Access the translatePage function defined in index.html
+      const win = window as ExtendedWindow;
+      if (win.translatePage) {
+        win.translatePage(googleLangCode);
+        console.log('Triggered translation to', googleLangCode);
+      } else {
+        console.error('window.translatePage function not found');
+      }
+    } else {
+      console.warn(`No mapping found for language code: ${langCode}`);
+    }
+  };
+
   const handleLanguageChange = (langCode: string) => {
     const lang = langCode.toLowerCase() as "en" | "es" | "fr" | "de" | "it";
-    dispatch(setLanguage(lang as Language));
+    
+    // Update Redux state
+    dispatch(setLanguageAction(lang as Language));
+    
+    // Use Google Translate for actual translation
+    translateWithGoogleTranslate(langCode);
+    
+    // Close dropdowns
     setIsDropdownOpen(false);
     setIsMobileLanguageOpen(false);
     setIsMobileMenuOpen(false);
+    
+    // Log the language change for debugging
+    console.log(`Language changed to: ${lang}`);
   };
 
   const handleCurrencyChange = (currencyCode: string) => {
@@ -363,4 +395,33 @@ const Header = () => {
   );
 };
 
+// Define the interface for the extended window with Google Translate properties
+interface ExtendedWindow extends Window {
+  translatePage?: (langCode: string) => void;
+  googleTranslateReady?: boolean;
+  pendingLanguageCode?: string | null;
+  googleTranslateElement?: object;
+  _translationObserver?: MutationObserver;
+  google?: {
+    translate: {
+      TranslateElement: {
+        new (
+          options: {
+            pageLanguage: string;
+            includedLanguages?: string;
+            layout?: string | { [key: string]: string };
+            autoDisplay?: boolean;
+          }, 
+          element: string
+        ): object;
+        InlineLayout: {
+          SIMPLE: string;
+        };
+        getInstance(): object;
+      };
+    };
+  };
+}
+
+// Give the wrapped component a name for Fast Refresh
 export default Header;
