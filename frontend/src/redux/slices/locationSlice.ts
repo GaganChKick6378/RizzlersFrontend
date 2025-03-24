@@ -7,18 +7,23 @@ export const detectUserLocation = createAsyncThunk(
   "location/detectUserLocation",
   async (_, { rejectWithValue }) => {
     try {
+      // Get the IP address first and wait for the response
+      const ipResponse = await axios.get('https://freeipapi.com/ip');
+      const ipAddress = ipResponse.data; // Extract the actual IP string from response
+      
       // For better reliability, use a single API call with complete location data
-      const locationResponse = await axios.get(`https://ipapi.co/json/`);
+      const locationResponse = await axios.get(`https://freeipapi.com/api/json/${ipAddress}`);
       
       // Extract the relevant fields
-      const { ip, country_name: country, currency } = locationResponse.data;
+      const { country_name: countryName, currency } = locationResponse.data;
+      const currencyCode = currency ? currency.code : '';
       
-      console.log(`Detected location: ${country} with currency: ${currency}`);
+      console.log(`Detected location: ${countryName} with currency: ${currencyCode}`);
       
       return {
-        country,
-        currency,
-        ip
+        countryName,
+        currency: currencyCode,
+        ipAddress: ipAddress
       };
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -54,9 +59,9 @@ const locationSlice = createSlice({
       })
       .addCase(detectUserLocation.fulfilled, (state, action) => {
         state.loading = false;
-        state.country = action.payload.country;
+        state.country = action.payload.countryName;
         state.currency = action.payload.currency;
-        state.ip = action.payload.ip;
+        state.ip = action.payload.ipAddress;
         state.detected = true;
       })
       .addCase(detectUserLocation.rejected, (state, action) => {
