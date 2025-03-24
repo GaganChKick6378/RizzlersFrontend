@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - QA
-  pull_request:
-    branches:
-      - QA
-    types: [closed]
 
 env:
   VITE_API_URL: ${{ secrets.VITE_API_URL_QA }}
