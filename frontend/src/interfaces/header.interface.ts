@@ -5,5 +5,6 @@ export interface HeaderState {
     currency: {
         code: string;
         symbol: string;
+        multiplier: number | null;
     };
 }

@@ -33,6 +33,9 @@ export function DatePickerWithRange({
   const { config } = useSelector((state: RootState) => state.landingConfig);
   const { rates, selectedDateRange, selectedPropertyId, loading } = useSelector((state: RootState) => state.roomRates);
   
+  // Get the currency from header state
+  const { currency } = useSelector((state: RootState) => state.header);
+  
   const maxStayDuration = config?.length_of_stay?.max || 14; // Default to 14 if not available
   const minStayDuration = config?.length_of_stay?.min || 1; // Default to 1 if not available
 
@@ -119,6 +122,13 @@ export function DatePickerWithRange({
     const isRangeEnd = selectedDateRange?.from && selectedDateRange?.to && 
       (day.getTime() === selectedDateRange.from.getTime() || day.getTime() === selectedDateRange.to.getTime());
     
+    // Apply currency conversion
+    const convertRate = (rate: number) => {
+      // Use multiplier if available, otherwise default to 1 (no conversion)
+      const multiplier = currency.multiplier ?? 1;
+      return Math.round(rate * multiplier * 100) / 100;
+    };
+    
     return (
       <>
         <div>{format(day, "d")}</div>
@@ -129,12 +139,12 @@ export function DatePickerWithRange({
             {rateInfo.has_promotion ? (
               <>
                 <div className={`line-through text-xs ${isRangeEnd ? 'text-white opacity-70' : 'text-gray-400'}`}>
-                  ${rateInfo.minimum_rate}
+                  {currency.symbol}{convertRate(rateInfo.minimum_rate)}
                 </div>
-                <div>${rateInfo.discounted_rate}</div>
+                <div>{currency.symbol}{convertRate(rateInfo.discounted_rate)}</div>
               </>
             ) : (
-              <div>${rateInfo.minimum_rate}</div>
+              <div>{currency.symbol}{convertRate(rateInfo.minimum_rate)}</div>
             )}
           </div>
         ) : null}
@@ -163,11 +173,14 @@ export function DatePickerWithRange({
       
       const rateInfo = getPriceForDate(currentDate);
       if (rateInfo) {
-        totalPrice += rateInfo.discounted_rate;
+        // Apply currency conversion to each day's rate
+        const rate = rateInfo.discounted_rate;
+        totalPrice += rate;
       }
     }
     
-    return totalPrice;
+    // Apply conversion to the total
+    return Math.round(totalPrice * (currency.multiplier ?? 1) * 100) / 100;
   };
 
   const totalPrice = calculateTotalPrice();
@@ -318,7 +331,7 @@ export function DatePickerWithRange({
                   <span className="text-gray-600 font-medium">Calculating total price...</span>
                 ) : totalPrice !== null ? (
                   <span className="text-[#26266D] font-semibold text-lg">
-                    Total: ${totalPrice.toFixed(2)}
+                    Total: {currency.symbol}{totalPrice.toFixed(2)}
                   </span>
                 ) : (
                   <span className="text-red-500 font-medium">Unable to calculate price</span>
@@ -331,7 +344,7 @@ export function DatePickerWithRange({
               onClick={handleApplyDates}
             >
               {selectedDateRange?.from && selectedDateRange?.to && !loading && totalPrice !== null 
-                ? `APPLY - $${totalPrice.toFixed(2)}`
+                ? `APPLY - ${currency.symbol}${totalPrice.toFixed(2)}`
                 : "APPLY DATES"
               }
             </Button>

@@ -3,8 +3,9 @@ import { useIntl } from "react-intl";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import FiGlobe from "../assets/fi_globe.svg";
 import { useDispatch, useSelector } from "react-redux";
-import { RootState } from "../redux/store";
-import { setCurrency, setLanguage } from "../redux/slices/headerSlice";
+import { RootState, AppDispatch } from "../redux/store";
+import { setCurrency, setLanguage, fetchCurrencyRate } from "../redux/slices/headerSlice";
+import { detectUserLocation } from "../redux/slices/locationSlice";
 import { Language } from "@/enums/language.enum";
 
 const Header = () => {
@@ -34,9 +35,15 @@ const Header = () => {
   const currencyDropdownRef = useRef<HTMLDivElement>(null);
   const intl = useIntl();
   const navigate = useNavigate();
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const { currency } = useSelector((state: RootState) => state.header);
   const config = useSelector((state: RootState) => state.landingConfig.config);
+  const { country, currency: detectedCurrency, detected } = useSelector((state: RootState) => state.location);
+
+  // Detect user's location based on IP
+  useEffect(() => {
+    dispatch(detectUserLocation());
+  }, [dispatch]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -58,8 +65,40 @@ const Header = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Set currency based on detected location if available
   useEffect(() => {
-    // Set default currency from API config if available
+    if (detected && config?.currencies?.options) {
+      // Check if the detected currency is available in the config
+      const detectedCurrencyOption = config.currencies.options.find(
+        (c) => c.code === detectedCurrency && c.active
+      );
+
+      if (detectedCurrencyOption) {
+        // First update the currency in the state
+        dispatch(
+          setCurrency({
+            code: detectedCurrencyOption.code,
+            symbol: detectedCurrencyOption.symbol,
+          })
+        );
+        
+        // Always fetch the conversion rate from the API, even for USD
+        dispatch(fetchCurrencyRate({ 
+          from: "USD", 
+          to: detectedCurrencyOption.code 
+        }));
+        
+        console.log(`Setting currency based on location: ${detectedCurrencyOption.code} (${country})`);
+      } else {
+        // If detected currency is not available, fall back to default from config
+        console.log(`Detected currency ${detectedCurrency} not available, using default`);
+        setDefaultCurrencyFromConfig();
+      }
+    }
+  }, [detected, detectedCurrency, config, dispatch, country]);
+
+  // Set default currency from config as a fallback
+  const setDefaultCurrencyFromConfig = () => {
     if (config?.currencies?.default) {
       const defaultCurrency = config.currencies.options.find(
         (c) => c.code === config.currencies?.default
@@ -74,7 +113,14 @@ const Header = () => {
         );
       }
     }
-  }, [config, dispatch]);
+  };
+
+  useEffect(() => {
+    // Only set default if we haven't detected a currency yet
+    if (!detected && config?.currencies?.default) {
+      setDefaultCurrencyFromConfig();
+    }
+  }, [config, dispatch, detected]);
 
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
   const toggleCurrencyDropdown = () =>
@@ -94,12 +140,19 @@ const Header = () => {
     );
 
     if (selectedCurrency) {
+      // First update the currency in the state
       dispatch(
         setCurrency({
           code: selectedCurrency.code,
           symbol: selectedCurrency.symbol,
         })
       );
+      
+      // Always fetch the conversion rate from the API, even for USD
+      dispatch(fetchCurrencyRate({ 
+        from: "USD", 
+        to: selectedCurrency.code 
+      }));
     }
 
     setIsCurrencyDropdownOpen(false);
