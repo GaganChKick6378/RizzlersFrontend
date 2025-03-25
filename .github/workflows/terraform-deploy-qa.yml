@@ -4,19 +4,56 @@ on:
   push:
     branches:
       - QA
-  pull_request:
-    branches:
-      - QA
-    types: [closed]
 
 env:
-  VITE_API_URL: ${{ secrets.VITE_API_URL_QA }}
+  VITE_API_URL: https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa
 
 jobs:
+  # Add test job as the first step
+  test:
+    name: "Run Tests - QA"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4.1.1
+        
+      - name: Use Node.js
+        uses: actions/setup-node@v4.0.0
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          yarn --version
+          
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+          
+      - name: Run Tests
+        run: yarn test
+        
+      - name: Generate Coverage Report
+        run: yarn run coverage
+        
+      - name: Upload Coverage Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-qa
+          path: frontend/coverage
+          retention-days: 7
+
   # Step 1: Plan the changes without applying them
   terraform-plan:
     name: "Terraform Plan for QA"
     runs-on: ubuntu-latest
+    needs: test
     permissions:
       contents: read
     
@@ -581,7 +618,7 @@ jobs:
   # Step 4: Build and deploy the frontend
   build-and-deploy:
     name: "Build and Deploy Frontend - QA"
-    needs: terraform-apply
+    needs: [terraform-apply, test]
     runs-on: ubuntu-latest
     env:
       WORKSPACE: qa
@@ -609,12 +646,68 @@ jobs:
       - name: Install Dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build Frontend
-        run: yarn build
+      - name: Build the QA Frontend
+        run: |
+          # Create a temporary .env.sentry-build-plugin file with Sentry configuration
+          echo "SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}" > .env.sentry-build-plugin
+          echo "SENTRY_ORG=${{ secrets.SENTRY_ORG }}" >> .env.sentry-build-plugin
+          echo "SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT }}" >> .env.sentry-build-plugin
+          
+          # Create or update the config/.env.qa.anv file
+          mkdir -p config
+          echo "VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa" > config/.env.qa.anv
+          echo "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}" >> config/.env.qa.anv
+          
+          # Create a direct .env file to ensure it's picked up
+          echo "VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa" > .env
+          
+          # Debug: Print configs to verify content
+          echo "========== DEBUGGING CONFIG FILES =========="
+          echo "Content of config/.env.qa.anv:"
+          cat config/.env.qa.anv
+          
+          echo "Content of .env:"
+          cat .env
+          
+          # Check if other config files exist that might override this
+          echo "Listing all config files:"
+          find config -type f | xargs ls -la
+          
+          if [ -f ".env.qa" ]; then
+            echo "Content of .env.qa (if exists):"
+            cat .env.qa
+          fi
+          
+          if [ -f "vite.config.js" ]; then
+            echo "Content of vite.config.js:"
+            cat vite.config.js
+          fi
+          
+          # Verify environment variables
+          echo "Environment variables for build:"
+          echo "VITE_APP_ENV: $VITE_APP_ENV"
+          echo "VITE_API_URL: $VITE_API_URL"
+          echo "==========================================="
+          
+          # Run the qa-specific build with explicit env var
+          VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa yarn qa:build
         env:
           VITE_APP_ENV: ${{ needs.terraform-apply.outputs.environment || 'qa' }}
-          VITE_API_URL: ${{ env.VITE_API_URL }}
+          VITE_API_URL: https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa
+      
+      # Add debugging step to check build output
+      - name: Debug build output
+        run: |
+          echo "========== DEBUGGING BUILD OUTPUT =========="
+          echo "Checking built files for API URL references:"
+          grep -r "api.ap-south-1.amazonaws.com" ./dist || echo "No direct API URL references found"
           
+          # Check any JS files that might contain the URL
+          echo "Searching JS files for API endpoint:"
+          find ./dist -name "*.js" -exec grep -l "amazonaws.com" {} \; | xargs cat || echo "No matches found"
+          echo "==========================================="
+        continue-on-error: true
+
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4.0.1
         with:

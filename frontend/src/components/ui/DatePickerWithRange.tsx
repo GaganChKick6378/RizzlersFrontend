@@ -14,6 +14,7 @@ import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
 import { cn } from "../../lib/utils";
+import FormattedPrice from "../ui/FormattedPrice";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
@@ -22,6 +23,26 @@ import { RootState, AppDispatch } from "../../redux/store";
 import { fetchDailyRates, setSelectedDateRange } from "../../redux/slices/roomRatesSlice";
 import { DailyRate } from "../../interfaces/roomRates.interface";
 
+// Custom hook for responsive design
+function useMediaQuery(query: string) {
+  const [matches, setMatches] = React.useState(false);
+
+  React.useEffect(() => {
+    const media = window.matchMedia(query);
+    
+    if (media.matches !== matches) {
+      setMatches(media.matches);
+    }
+    
+    const listener = () => setMatches(media.matches);
+    media.addEventListener("change", listener);
+    
+    return () => media.removeEventListener("change", listener);
+  }, [matches, query]);
+
+  return matches;
+}
+
 export function DatePickerWithRange({
   className,
 }: React.HTMLAttributes<HTMLDivElement>) {
@@ -29,9 +50,15 @@ export function DatePickerWithRange({
   const today = startOfToday();
   const [open, setOpen] = React.useState(false);
   
+  // Responsive breakpoint - true if mobile
+  const isMobile = useMediaQuery("(max-width: 768px)");
+  
   // Get data from Redux store
   const { config } = useSelector((state: RootState) => state.landingConfig);
   const { rates, selectedDateRange, selectedPropertyId, loading } = useSelector((state: RootState) => state.roomRates);
+  
+  // Get the currency from header state
+  const { currency } = useSelector((state: RootState) => state.header);
   
   const maxStayDuration = config?.length_of_stay?.max || 14; // Default to 14 if not available
   const minStayDuration = config?.length_of_stay?.min || 1; // Default to 1 if not available
@@ -119,6 +146,13 @@ export function DatePickerWithRange({
     const isRangeEnd = selectedDateRange?.from && selectedDateRange?.to && 
       (day.getTime() === selectedDateRange.from.getTime() || day.getTime() === selectedDateRange.to.getTime());
     
+    // Apply currency conversion
+    const convertRate = (rate: number) => {
+      // Use multiplier if available, otherwise default to 1 (no conversion)
+      const multiplier = currency.multiplier ?? 1;
+      return Math.round(rate * multiplier * 100) / 100;
+    };
+    
     return (
       <>
         <div>{format(day, "d")}</div>
@@ -129,12 +163,28 @@ export function DatePickerWithRange({
             {rateInfo.has_promotion ? (
               <>
                 <div className={`line-through text-xs ${isRangeEnd ? 'text-white opacity-70' : 'text-gray-400'}`}>
-                  ${rateInfo.minimum_rate}
+                  <FormattedPrice 
+                    amount={convertRate(rateInfo.minimum_rate)}
+                    currencyCode={currency.code}
+                    currencySymbol={currency.symbol}
+                  />
                 </div>
-                <div>${rateInfo.discounted_rate}</div>
+                <div>
+                  <FormattedPrice 
+                    amount={convertRate(rateInfo.discounted_rate)}
+                    currencyCode={currency.code}
+                    currencySymbol={currency.symbol}
+                  />
+                </div>
               </>
             ) : (
-              <div>${rateInfo.minimum_rate}</div>
+              <div>
+                <FormattedPrice 
+                  amount={convertRate(rateInfo.minimum_rate)}
+                  currencyCode={currency.code}
+                  currencySymbol={currency.symbol}
+                />
+              </div>
             )}
           </div>
         ) : null}
@@ -163,11 +213,14 @@ export function DatePickerWithRange({
       
       const rateInfo = getPriceForDate(currentDate);
       if (rateInfo) {
-        totalPrice += rateInfo.discounted_rate;
+        // Apply currency conversion to each day's rate
+        const rate = rateInfo.discounted_rate;
+        totalPrice += rate;
       }
     }
     
-    return totalPrice;
+    // Apply conversion to the total
+    return Math.round(totalPrice * (currency.multiplier ?? 1) * 100) / 100;
   };
 
   const totalPrice = calculateTotalPrice();
@@ -211,50 +264,77 @@ export function DatePickerWithRange({
         </PopoverTrigger>
 
         <PopoverContent
-          className="absolute left-0 top-full mt-2 w-[896px] bg-white shadow-md z-50"
+          className={cn(
+            "absolute left-0 top-full mt-2 bg-white shadow-md z-50", 
+            isMobile ? "w-[20rem]" : "w-[56rem]"
+          )}
           align="start"
           side="bottom"
           sideOffset={5}
         >
-          <div className="p-4">
-            <div className="flex space-x-8">
-              <div className="w-full">
-                <div className="flex items-center mb-4 justify-start">
-                <span className="text-lg font-medium mx-2">{format(currentMonth, "MMMM")}</span>
+          <div className={cn("h-auto", isMobile ? "max-h-[31.375rem]" : "h-[31.375rem]")}>
+            {isMobile ? (
+              // Mobile view - One month
+              <div className="w-full p-2">
+                <div className="flex items-center mb-4 justify-between">
                   <button
                     onClick={prevMonth}
-                    className="h-6 w-6 flex items-center justify-center mx-1"
+                    className="h-6 w-6 flex items-center justify-center"
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
                   </button>
-                  
+                  <span className="text-lg font-400 text-[#5D5D5D]">
+                    {format(currentMonth, "MMMM yyyy")}
+                  </span>
                   <button
                     onClick={nextMonth}
-                    className="h-6 w-6 flex items-center justify-center mx-1"
+                    className="h-6 w-6 flex items-center justify-center"
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
                   </button>
                 </div>
               </div>
+            ) : (
+              // Desktop view - Two months
+              <div className="flex space-x-8">
+                <div className="w-full pl-2">
+                  <div className="flex items-center mb-4 justify-start">
+                    <span className="text-lg font-400 text-[#5D5D5D]">{format(currentMonth, "MMMM")}</span>
+                    <button
+                      onClick={prevMonth}
+                      className="h-6 w-6 flex items-center justify-center ml-[1.4375rem]"
+                    >
+                      <ChevronLeft className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
+                    </button>
+                    
+                    <button
+                      onClick={nextMonth}
+                      className="h-6 w-6 flex items-center justify-center"
+                    >
+                      <ChevronRight className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
+                    </button>
+                  </div>
+                </div>
 
-              <div className="w-full">
-                <div className="flex items-center mb-4 justify-start">
-                <span className="text-lg font-medium mr-2">{format(rightMonth, "MMMM")}</span>
-                <button
-                    onClick={prevMonth}
-                    className="h-6 w-6 flex items-center justify-center mx-1"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={nextMonth}
-                    className="h-6 w-6 flex items-center justify-center mx-1"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                <div className="w-full">
+                  <div className="flex items-center mb-4 justify-start">
+                    <span className="text-lg font-400 text-[#5D5D5D]">{format(rightMonth, "MMMM")}</span>
+                    <button
+                      onClick={prevMonth}
+                      className="h-6 w-6 flex items-center justify-center ml-[1.4375rem]"
+                    >
+                      <ChevronLeft className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
+                    </button>
+                    <button
+                      onClick={nextMonth}
+                      className="h-6 w-6 flex items-center justify-center"
+                    >
+                      <ChevronRight className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <Calendar
               initialFocus
@@ -263,8 +343,12 @@ export function DatePickerWithRange({
               month={currentMonth}
               selected={selectedDateRange || undefined}
               onSelect={handleSelect}
-              numberOfMonths={2}
+              numberOfMonths={isMobile ? 1 : 2}
               disabled={isDisabled}
+              weekStartsOn={0}
+              modifiers={{
+                today: []  // Empty array to disable today highlighting
+              }}
               modifiersStyles={{
                 day_range_start: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem" },
                 day_range_end: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem" },
@@ -272,16 +356,17 @@ export function DatePickerWithRange({
                 selected: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem" }
               }}
               classNames={{
-                months: "flex space-x-9",
+                months: isMobile ? "" : "flex space-x-9",
                 month: "w-full relative",
                 caption: "hidden",
                 nav: "hidden",
                 table: "w-full border-collapse",
                 head_row: "flex justify-between text-gray-600 text-sm font-medium mb-2",
                 head_cell: "w-10 text-center",
-                row: "flex justify-between gap-2", // Added gap-2 for horizontal spacing between date boxes
-                cell: "w-[3.125rem] h-[2.5rem] flex flex-col items-center justify-center mb-7", // Added mb-2 for vertical spacing
-                day: "h-[2.5rem] w-[3.125rem] flex flex-col items-center justify-center", 
+                row: "flex justify-between gap-2", 
+                cell: isMobile ? "mb-7 flex flex-col items-center justify-center" : "w-[50px] mb-7 flex flex-col items-center justify-center",
+                day: isMobile ? "flex flex-col items-center justify-center" : "w-[50px] flex flex-col items-center justify-center", 
+                day_today: "",  // Empty string to remove today styling
                 day_selected: "!bg-[#26266D] !text-white !font-bold !p-1 !min-h-15",
                 day_range_start: "!bg-[#26266D] !text-white !font-bold !p-1",
                 day_range_end: "!bg-[#26266D] !text-white !font-bold !p-1",
@@ -290,18 +375,52 @@ export function DatePickerWithRange({
               }}
               formatters={{
                 formatDay: (date) => {
+                  const rateInfo = getPriceForDate(date);
+                  const dayHeight = rateInfo?.has_promotion ? "h-[58px]" : "h-[40px]";
+                  
                   return (
-                    <div className="flex flex-col items-center justify-center h-full">
+                    <div className={`flex flex-col items-center justify-center ${dayHeight}`}>
                       {renderDayContents(date)}
                     </div>
                   );
+                },
+                formatWeekdayName: (day) => {
+                  const weekdayLabels = ["SU", "M", "T", "W", "TH", "F", "S"];
+                  return <span className="text-[#858685]">{weekdayLabels[day.getDay()]}</span>;
                 }
               }}
             />
           </div>
-          <div className="p-4 border-t border-gray-200 flex justify-between items-center">
-            <div className="flex flex-col">
-              <span className="text-red-500 text-xs mb-1">
+          
+          <div className="p-4 border-t border-gray-200 flex flex-col">
+            <div className={cn("flex justify-between items-center w-full mb-2", isMobile && "flex-col gap-3")}>
+              <div className="flex flex-col">
+                {selectedDateRange?.from && selectedDateRange?.to && (
+                  loading ? (
+                    <span className="text-gray-600 font-medium">Calculating total price...</span>
+                  ) : totalPrice !== null ? (
+                    <span className="text-[#26266D] font-semibold text-lg">
+                      Total: <FormattedPrice 
+                        amount={totalPrice}
+                        currencyCode={currency.code}
+                        currencySymbol={currency.symbol}
+                      />
+                    </span>
+                  ) : (
+                    <span className="text-red-500 font-medium">Unable to calculate price</span>
+                  )
+                )}
+              </div>
+              <Button
+                className="bg-[#26266D] h-10 px-4 text-sm pt-[0.75rem] disabled:bg-[#C1C2C2] pb-[0.75rem] pl-[1.25rem] pr-[1.25rem]"
+                disabled={!selectedDateRange?.from || !selectedDateRange?.to || loading}
+                onClick={handleApplyDates}
+              >
+                APPLY DATES
+              </Button>
+            </div>
+            <div className="text-end mt-1 w-full">
+              <span className="text-red-500 text-xs w-[10.6875rem]">
                 {selectedDateRange?.from && selectedDateRange?.to && (
                   differenceInDays(selectedDateRange.to, selectedDateRange.from) > maxStayDuration
                     ? `Max. length of stay: ${maxStayDuration} days`
@@ -310,31 +429,10 @@ export function DatePickerWithRange({
                       : ""
                 )}
                 {selectedDateRange?.from && !selectedDateRange?.to && 
-                  `Please select end date. (${minStayDuration}-${maxStayDuration} days)`
+                  `Please select end date. Max length of stay: ${maxStayDuration} days)`
                 }
               </span>
-              {selectedDateRange?.from && selectedDateRange?.to && (
-                loading ? (
-                  <span className="text-gray-600 font-medium">Calculating total price...</span>
-                ) : totalPrice !== null ? (
-                  <span className="text-[#26266D] font-semibold text-lg">
-                    Total: ${totalPrice.toFixed(2)}
-                  </span>
-                ) : (
-                  <span className="text-red-500 font-medium">Unable to calculate price</span>
-                )
-              )}
             </div>
-            <Button
-              className="bg-[#26266D] h-10 px-4 text-sm"
-              disabled={!selectedDateRange?.from || !selectedDateRange?.to || loading}
-              onClick={handleApplyDates}
-            >
-              {selectedDateRange?.from && selectedDateRange?.to && !loading && totalPrice !== null 
-                ? `APPLY - $${totalPrice.toFixed(2)}`
-                : "APPLY DATES"
-              }
-            </Button>
           </div>
         </PopoverContent>
       </Popover>

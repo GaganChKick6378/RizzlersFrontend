@@ -6,6 +6,46 @@ on:
       - dev
 
 jobs:
+  # Add a test job before terraform
+  test:
+    name: "Run Tests - Dev"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Enable Corepack
+        run: |
+          corepack enable
+          yarn --version
+          
+      - name: Install Dependencies
+        run: yarn install --frozen-lockfile
+          
+      - name: Run Tests
+        run: yarn test
+        
+      - name: Generate Coverage Report
+        run: yarn run coverage
+        
+      - name: Upload Coverage Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: frontend/coverage
+          retention-days: 7
+
   terraform:
     name: "Terraform for Dev"
     runs-on: ubuntu-latest
@@ -13,6 +53,8 @@ jobs:
     if: github.ref == 'refs/heads/dev'
     permissions:
       contents: read
+    # Make terraform job depend on successful test run
+    needs: test
     
     defaults:
       run:
@@ -411,7 +453,7 @@ jobs:
 
   build-and-deploy:
     name: "Build and Deploy Frontend - Dev"
-    needs: terraform
+    needs: [terraform, test]
     # Only run this job when the pull request is merged or on direct push to dev
     if: (github.event_name == 'push' && github.ref == 'refs/heads/dev') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
     runs-on: ubuntu-latest

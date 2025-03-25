@@ -32,3 +32,5 @@ lerna-debug.log*
 dist
 dist-ssr
 build
+
+./coverage
