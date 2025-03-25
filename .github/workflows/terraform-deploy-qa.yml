@@ -689,45 +689,22 @@ jobs:
           echo "VITE_API_URL: $VITE_API_URL"
           echo "==========================================="
           
-          # Set the env vars directly in vite.config.js if it exists
-          if [ -f "vite.config.js" ]; then
-            echo "Adding define plugin to vite.config.js to hardcode the URL..."
-            # Backup the original file
-            cp vite.config.js vite.config.js.bak
-            
-            # Add a define plugin to hardcode the URL during build
-            sed -i '/plugins: \[/a \    { name: "hardcode-qa-url", config() { return { define: { "import.meta.env.VITE_API_URL": JSON.stringify("https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa") } } } },' vite.config.js
-            
-            echo "Modified vite.config.js:"
-            cat vite.config.js
-          fi
-          
           # Run the qa-specific build with explicit env var
           VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa yarn qa:build
         env:
           VITE_APP_ENV: ${{ needs.terraform-apply.outputs.environment || 'qa' }}
           VITE_API_URL: https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa
       
-      # Modify the debug step to be more thorough
+      # Add debugging step to check build output
       - name: Debug build output
         run: |
           echo "========== DEBUGGING BUILD OUTPUT =========="
           echo "Checking built files for API URL references:"
+          grep -r "api.ap-south-1.amazonaws.com" ./dist || echo "No direct API URL references found"
           
-          # More comprehensive search for any API URLs
-          echo "Searching for dev URL:"
-          grep -r "uydc3b10re.execute-api.ap-south-1.amazonaws.com/dev" ./dist || echo "No dev API URL references found"
-          
-          echo "Searching for qa URL:"
-          grep -r "lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa" ./dist || echo "No qa API URL references found"
-          
-          echo "Searching for any amazonaws.com URLs:"
-          grep -r "amazonaws.com" ./dist || echo "No AWS API URLs found"
-          
-          # Extract any potential URLs from JS files
-          echo "Extracting potential URLs from JS files:"
-          find ./dist -name "*.js" -exec grep -o 'https://[^"]*' {} \; | sort | uniq
-          
+          # Check any JS files that might contain the URL
+          echo "Searching JS files for API endpoint:"
+          find ./dist -name "*.js" -exec grep -l "amazonaws.com" {} \; | xargs cat || echo "No matches found"
           echo "==========================================="
         continue-on-error: true
 
