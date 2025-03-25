@@ -27,3 +27,32 @@ export const formatCurrency = (amount: number, currencyCode: string, locale: str
     currency: currencyCode,
   }).format(amount);
 };
+
+/**
+ * Formats currency value with appropriate formatting based on currency and amount
+ * For INR (Rupees), format thousands as K format (e.g., 1K, 1.3K)
+ * 
+ * @param amount The amount to format
+ * @param currencyCode The currency code (e.g., 'INR', 'USD')
+ * @param currencySymbol The currency symbol (e.g., '₹', '$')
+ * @returns Formatted currency string
+ */
+export const formatCurrencyValue = (
+  amount: number, 
+  currencyCode: string, 
+  currencySymbol: string
+): string => {
+  // For INR and amounts >= 1000, use K format
+  if (currencyCode === 'INR' && amount >= 1000) {
+    // Format to one decimal place if not a whole number of thousands
+    const inK = amount / 1000;
+    const formatted = inK % 1 !== 0 
+      ? inK.toFixed(1).replace(/\.0$/, '') // Remove .0 if it ends with it
+      : inK.toString();
+    
+    return `${currencySymbol}${formatted}K`;
+  }
+  
+  // For other currencies or smaller amounts, use standard formatting
+  return `${currencySymbol}${amount.toFixed(2).replace(/\.00$/, '')}`;
+};
