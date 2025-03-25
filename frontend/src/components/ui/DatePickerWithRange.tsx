@@ -14,6 +14,7 @@ import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
 import { cn } from "../../lib/utils";
+import FormattedPrice from "../ui/FormattedPrice";
 import { Button } from "./button";
 import { Calendar } from "./calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
@@ -162,12 +163,28 @@ export function DatePickerWithRange({
             {rateInfo.has_promotion ? (
               <>
                 <div className={`line-through text-xs ${isRangeEnd ? 'text-white opacity-70' : 'text-gray-400'}`}>
-                  {currency.symbol}{convertRate(rateInfo.minimum_rate)}
+                  <FormattedPrice 
+                    amount={convertRate(rateInfo.minimum_rate)}
+                    currencyCode={currency.code}
+                    currencySymbol={currency.symbol}
+                  />
                 </div>
-                <div>{currency.symbol}{convertRate(rateInfo.discounted_rate)}</div>
+                <div>
+                  <FormattedPrice 
+                    amount={convertRate(rateInfo.discounted_rate)}
+                    currencyCode={currency.code}
+                    currencySymbol={currency.symbol}
+                  />
+                </div>
               </>
             ) : (
-              <div>{currency.symbol}{convertRate(rateInfo.minimum_rate)}</div>
+              <div>
+                <FormattedPrice 
+                  amount={convertRate(rateInfo.minimum_rate)}
+                  currencyCode={currency.code}
+                  currencySymbol={currency.symbol}
+                />
+              </div>
             )}
           </div>
         ) : null}
@@ -383,7 +400,11 @@ export function DatePickerWithRange({
                     <span className="text-gray-600 font-medium">Calculating total price...</span>
                   ) : totalPrice !== null ? (
                     <span className="text-[#26266D] font-semibold text-lg">
-                      Total: {currency.symbol}{totalPrice.toFixed(2)}
+                      Total: <FormattedPrice 
+                        amount={totalPrice}
+                        currencyCode={currency.code}
+                        currencySymbol={currency.symbol}
+                      />
                     </span>
                   ) : (
                     <span className="text-red-500 font-medium">Unable to calculate price</span>
