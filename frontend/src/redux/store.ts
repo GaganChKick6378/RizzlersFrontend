@@ -12,7 +12,7 @@ import locationReducer from './slices/locationSlice';
 const persistConfig = {
   key: 'rizzlers-state',
   storage,
-  whitelist: ['roomRates', 'header', 'location'],
+  whitelist: [ 'header', 'location', 'landingConfig'],
 };
 
 // Combine the reducers
