@@ -6,7 +6,7 @@ on:
       - QA
 
 env:
-  VITE_API_URL: ${{ secrets.VITE_API_URL_QA }}
+  VITE_API_URL: https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa
 
 jobs:
   # Add test job as the first step
@@ -655,22 +655,23 @@ jobs:
           
           # Create or update the config/.env.qa.anv file
           mkdir -p config
-          echo "VITE_API_URL=${{ secrets.VITE_API_URL_QA }}" > config/.env.qa.anv
+          echo "VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa" > config/.env.qa.anv
           echo "VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}" >> config/.env.qa.anv
+          
+          # Create a direct .env file to ensure it's picked up
+          echo "VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa" > .env
           
           # Debug: Print configs to verify content
           echo "========== DEBUGGING CONFIG FILES =========="
           echo "Content of config/.env.qa.anv:"
           cat config/.env.qa.anv
           
+          echo "Content of .env:"
+          cat .env
+          
           # Check if other config files exist that might override this
           echo "Listing all config files:"
           find config -type f | xargs ls -la
-          
-          if [ -f ".env" ]; then
-            echo "Content of .env (if exists):"
-            cat .env
-          fi
           
           if [ -f ".env.qa" ]; then
             echo "Content of .env.qa (if exists):"
@@ -688,11 +689,11 @@ jobs:
           echo "VITE_API_URL: $VITE_API_URL"
           echo "==========================================="
           
-          # Run the qa-specific build
-          yarn qa:build
+          # Run the qa-specific build with explicit env var
+          VITE_API_URL=https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa yarn qa:build
         env:
           VITE_APP_ENV: ${{ needs.terraform-apply.outputs.environment || 'qa' }}
-          VITE_API_URL: ${{ secrets.VITE_API_URL_QA }}
+          VITE_API_URL: https://lmak1hj7n7.execute-api.ap-south-1.amazonaws.com/qa
       
       # Add debugging step to check build output
       - name: Debug build output
