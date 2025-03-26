@@ -18,7 +18,7 @@ const Footer = () => {
             className="h-[1.5625rem] w-[8.839375rem]" 
           />
         </div>
-        <div className="flex flex-col items-end gap-y-[0.0125rem] max-w-[17.0625rem] font-400 text-sm">
+        <div className="flex flex-col items-end gap-y-[0.0125rem] max-w-[17.0625rem] font-400 text-[1rem]">
           <p>{footerData?.copyright || "© Kickdrum Technology Group LLC."}</p>
           <p>{footerData?.desc || "All rights reserved."}</p>
         </div>

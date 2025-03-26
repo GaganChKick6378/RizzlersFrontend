@@ -216,7 +216,7 @@ const Header = () => {
           className="w-[6.44rem] h-[2.3rem] cursor-pointer mt-1"
           onClick={() => navigate(`/${currentTenantId}`)}
         />
-        <span className="text-[#26266D] font-lato font-bold text-[1.25rem] tracking-[0px] md:ml-[0.3125rem] md:mt-0 h-[1.625rem]">
+        <span className="text-[#26266D] font-lato font-bold text-[1.25rem] tracking-[0px] md:ml-[0.3125rem] md:mt-0 h-[1.625rem] cursor-pointer" onClick={() => navigate(`/${currentTenantId}`)}>
           {config?.page_title?.text || intl.formatMessage({ id: "text" })}
         </span>
       </div>
@@ -263,7 +263,7 @@ const Header = () => {
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={toggleDropdown}
-              className="flex items-center space-x-2 text-[#130739] py-2 px-4 rounded-md"
+              className="flex items-center space-x-2 text-[#130739] py-1 px-2 rounded-md h-[1.1875rem] w-[2.8125rem]"
             >
               <img src={FiGlobe} alt="Language" className="w-4 h-4 mr-1" />
               <span>{intl.formatMessage({ id: "language" })}</span>
@@ -289,7 +289,7 @@ const Header = () => {
         {activeCurrencies.length > 0 && (
           <div ref={currencyDropdownRef}>
             <button
-              className="text-[#130739] text-sm flex items-center cursor-pointer"
+              className="text-[#130739] text-sm flex items-center cursor-pointer w-[3.1875rem] h-[1.25rem]"
               onClick={toggleCurrencyDropdown}
             >
               <span className="mr-1">{currency.symbol}</span>

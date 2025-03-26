@@ -249,7 +249,7 @@ const Home: React.FC = () => {
               <input
                 type="checkbox"
                 id="accessible-room"
-                className="h-4 w-4 text-[#130739] border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                className="h-4 w-4 text-[#26266D] accent-[#26266D] border-gray-300 rounded focus:ring-2"
               />
               <label
                 htmlFor="accessible-room"

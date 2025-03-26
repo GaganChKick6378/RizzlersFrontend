@@ -266,13 +266,13 @@ export function DatePickerWithRange({
         <PopoverContent
           className={cn(
             "absolute left-0 top-full mt-2 bg-white shadow-md z-50", 
-            isMobile ? "w-[20rem]" : "w-[56rem]"
+            isMobile ? "w-[20rem] max-h-[50vh] overflow-y-auto" : "w-[56rem]" // Added max-height and overflow
           )}
           align="start"
           side="bottom"
-          sideOffset={5}
+          sideOffset={-8}
         >
-          <div className={cn("h-auto", isMobile ? "max-h-[31.375rem]" : "h-[31.375rem]")}>
+          <div className={cn("h-full", isMobile ? "max-h-[calc(70vh-2rem)]" : "h-[31.375rem]")}>
             {isMobile ? (
               // Mobile view - One month
               <div className="w-full p-2">
