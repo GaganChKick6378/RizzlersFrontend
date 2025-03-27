@@ -50,14 +50,8 @@ const headerSlice = createSlice({
     initialState,
     reducers: {
         setLanguage: (state, action: PayloadAction<Language>) => {
-            const language = action.payload;
-            state.language = language;
-            // Update currency when language changes, but keep the multiplier
-            const newCurrency = getCurrencyByLocale(language.toLowerCase());
-            state.currency = {
-                ...newCurrency,
-                multiplier: state.currency.multiplier
-            };
+            state.language = action.payload;
+            // Remove the currency update logic
         },
         setCurrency: (state, action: PayloadAction<{ code: string; symbol: string; multiplier?: number }>) => {
             state.currency = {
