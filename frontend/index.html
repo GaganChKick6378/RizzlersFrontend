@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hotel Booking Engine</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        width: 100%;
+        height: 100%;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: auto;
+        min-height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        display: flex;
+        justify-content: center;
+      }
+      .site-container {
+        position: relative;
+        width: 100vw; 
+        max-width: 100vw; 
+        height: auto;
+        min-height: 1024px;
+        overflow-x: hidden;
+        overflow-y: visible;
+      }
+      
+      @media (max-width: 100vw) {  
+        .site-container {
+          width: 100vw; 
+        }
+      }
+      
+      /* Hide Google Translate toolbar and attribution */
+      .goog-te-banner-frame,
+      .skiptranslate,
+      .goog-te-balloon-frame,
+      #goog-gt-tt {
+        display: none !important;
+        visibility: hidden !important;
+      }
+      
+      .goog-te-menu-value:hover {
+        text-decoration: none !important;
+      }
+      
+      .goog-tooltip,
+      .goog-tooltip:hover {
+        display: none !important;
+      }
+      
+      .goog-text-highlight {
+        background-color: transparent !important;
+        box-shadow: none !important;
+        border: none !important;
+      }
+      
+      body {
+        top: 0 !important;
+        position: static !important;
+      }
+      
+      .VIpgJd-ZVi9od-aZ2wEe-wOHMyf,
+      .VIpgJd-ZVi9od-aZ2wEe-OiiCO,
+      #goog-gt-,
+      .VIpgJd-ZVi9od-aZ2wEe-ORHb,
+      .VIpgJd-ZVi9od-aZ2wEe-OiiCO-SxQuSe,
+      .VIpgJd-ZVi9od-l4eHX-hSRGPd {
+        display: none !important;
+      }
+      
+      /* Hide google translate link | logo | banner */
+      .goog-logo-link,
+      .gskiptranslate,
+      .goog-te-gadget span,
+      .goog-te-banner-frame,
+      #goog-gt-tt, 
+      .goog-te-balloon-frame,
+      div#goog-gt-,
+      .goog-te-menu-frame {
+        display: none !important;
+      }
+      
+      .goog-te-gadget {
+        height: 0;
+        overflow: hidden;
+        visibility: hidden;
+      }
+      
+      .goog-te-banner-frame.skiptranslate {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="google_element" style="display:none;"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Global variable to track if Google Translate is ready
+      window.googleTranslateReady = false;
+      window.pendingLanguageCode = null;
+      window.googleTranslateElement = null;
+      
+      // Create an invisible iframe to handle translations without refreshing
+      function createTranslationFrame() {
+        // Check if frame already exists
+        if (document.getElementById('translation_frame')) return;
+        
+        const frame = document.createElement('iframe');
+        frame.id = 'translation_frame';
+        frame.style.display = 'none';
+        frame.style.visibility = 'hidden';
+        frame.style.height = '0';
+        frame.style.width = '0';
+        frame.src = 'about:blank';
+        document.body.appendChild(frame);
+      }
+      
+      // Function to directly use the Google Translate JavaScript API
+      window.translatePage = function(langCode) {
+        if (!langCode) return;
+        console.log("Translate request received for:", langCode);
+        
+        // Ensure Google banners are hidden after translation attempts
+        ensureGoogleHeaderIsHidden();
+        
+        if (window.googleTranslateReady) {
+          console.log("Google Translate is ready, translating to:", langCode);
+          
+          // For English, use the original content
+          if (langCode === 'en') {
+            doGoogleTranslate('');
+            return;
+          }
+          
+          // For other languages, trigger translation
+          doGoogleTranslate(langCode);
+        } else {
+          console.log("Google Translate not ready yet, storing language:", langCode);
+          // Store the language for when Google Translate becomes ready
+          window.pendingLanguageCode = langCode;
+          
+          // Try to initialize Google Translate now
+          initGoogleTranslate();
+        }
+      };
+      
+      // Ensure Google header is always hidden
+      function ensureGoogleHeaderIsHidden() {
+        // Use MutationObserver to keep removing any Google Translate banners that appear
+        if (!window._translationObserver) {
+          window._translationObserver = new MutationObserver(function(mutations) {
+            // Hide any Google Translate-related elements that appear
+            const elementsToHide = document.querySelectorAll('.goog-te-banner-frame, .skiptranslate');
+            elementsToHide.forEach(el => {
+              el.style.display = 'none';
+              el.style.visibility = 'hidden';
+            });
+            
+            // Make sure body has top:0 to prevent shifting
+            document.body.style.top = '0px';
+            document.body.style.position = 'static';
+          });
+          
+          // Start observing the document with the configured parameters
+          window._translationObserver.observe(document.body, { 
+            childList: true, 
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['style', 'class']
+          });
+        }
+      }
+      
+      // Helper function to actually perform the Google Translate operation
+      function doGoogleTranslate(langCode) {
+        try {
+          console.log("Attempting to translate to:", langCode || "original language");
+          
+          // Method 1: Try using the Google Translate Element API
+          if (window.googleTranslateElement && typeof window.googleTranslateElement.translate === 'function') {
+            window.googleTranslateElement.translate(langCode);
+            return true;
+          }
+          
+          // Method 2: Try multiple selector patterns for the dropdown
+          const selectors = [
+            '.goog-te-combo',
+            '.VIpgJd-ZVi9od-l4eHX-hSRGPd',
+            'select[aria-label="Language Translate Widget"]',
+            '#google_translate_element select',
+            '#\\:1\\.container select',
+            'select.goog-te-combo'
+          ];
+          
+          let teCombo = null;
+          for (const selector of selectors) {
+            const element = document.querySelector(selector);
+            if (element) {
+              teCombo = element;
+              break;
+            }
+          }
+          
+          if (teCombo) {
+            console.log("Found Google Translate dropdown:", teCombo);
+            teCombo.value = langCode;
+            teCombo.dispatchEvent(new Event('change', { bubbles: true }));
+            
+            // Hide any Google elements that might appear after translation
+            setTimeout(ensureGoogleHeaderIsHidden, 300);
+            setTimeout(ensureGoogleHeaderIsHidden, 1000);
+            return true;
+          }
+          
+          // Method 3: Use cookie-based approach without page refresh
+          console.log("Using cookie-based approach");
+          document.cookie = `googtrans=/auto/${langCode || 'en'}`;
+          createTranslationFrame();
+          
+          // Try to trigger the translation without page reload
+          const frame = document.getElementById('translation_frame');
+          if (frame) {
+            try {
+              // Try to reload just the frame to trigger translation
+              frame.contentWindow.location.reload();
+            } catch (e) {
+              console.warn("Failed to reload translation frame:", e);
+            }
+          }
+          
+          // Still try to find and use any translate element that might have appeared
+          setTimeout(() => {
+            const newTeCombo = document.querySelector('.goog-te-combo, .VIpgJd-ZVi9od-l4eHX-hSRGPd');
+            if (newTeCombo) {
+              newTeCombo.value = langCode;
+              newTeCombo.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+            ensureGoogleHeaderIsHidden();
+          }, 500);
+          
+          return true;
+        } catch (error) {
+          console.error("Error translating page:", error);
+          return false;
+        }
+      }
+      
+      // Initialize Google Translate if not already done
+      function initGoogleTranslate() {
+        if (!window.google || !window.google.translate || !window.google.translate.TranslateElement) {
+          console.log("Google Translate not yet loaded, will retry");
+          return false;
+        }
+        
+        if (!document.getElementById('google_element').hasChildNodes()) {
+          console.log("Initializing Google Translate");
+          window.googleTranslateElement = new google.translate.TranslateElement(
+            { 
+              pageLanguage: 'en',
+              autoDisplay: false,
+              includedLanguages: 'es,fr,de,it',
+              layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+            },
+            'google_element'
+          );
+          
+          // Wait for elements to be created
+          observeTranslateElements();
+        }
+        
+        return true;
+      }
+      
+      // Function to observe when translate elements appear in DOM
+      function observeTranslateElements() {
+        // Create an observer instance
+        const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+            if (mutation.addedNodes && mutation.addedNodes.length > 0) {
+              // Check for Google Translate elements using multiple selectors
+              const selectors = [
+                '.goog-te-combo',
+                '.VIpgJd-ZVi9od-l4eHX-hSRGPd',
+                'select[aria-label="Language Translate Widget"]',
+                '#google_translate_element select',
+                '#\\:1\\.container select',
+                'select.goog-te-combo'
+              ];
+              
+              let found = false;
+              for (const selector of selectors) {
+                if (document.querySelector(selector)) {
+                  found = true;
+                  break;
+                }
+              }
+              
+              if (found && !window.googleTranslateReady) {
+                console.log("Google Translate element detected in DOM");
+                window.googleTranslateReady = true;
+                
+                // Hide any Google elements
+                ensureGoogleHeaderIsHidden();
+                
+                if (window.pendingLanguageCode) {
+                  console.log("Applying pending language:", window.pendingLanguageCode);
+                  setTimeout(() => {
+                    window.translatePage(window.pendingLanguageCode);
+                    window.pendingLanguageCode = null;
+                  }, 500);
+                }
+              }
+            }
+          });
+        });
+        
+        // Start observing the document body for DOM changes
+        observer.observe(document.body, { 
+          childList: true, 
+          subtree: true 
+        });
+      }
+      
+      function loadGoogleTranslate() {
+        // Create translation frame
+        createTranslationFrame();
+        
+        // Initialize Google Translate
+        initGoogleTranslate();
+        
+        // Ensure headers are hidden
+        ensureGoogleHeaderIsHidden();
+        
+        // Mark Google Translate as ready after a delay to ensure full initialization
+        setTimeout(() => {
+          console.log("Setting Google Translate as ready");
+          window.googleTranslateReady = true;
+          
+          // Check if there's a pending language code to apply
+          if (window.pendingLanguageCode) {
+            console.log("Applying pending language:", window.pendingLanguageCode);
+            window.translatePage(window.pendingLanguageCode);
+            window.pendingLanguageCode = null;
+          }
+        }, 2000);
+      }
+      
+      // Set up mutation observer to hide Google elements as soon as they appear
+      document.addEventListener('DOMContentLoaded', function() {
+        ensureGoogleHeaderIsHidden();
+      });
+    </script>
+    <script src="https://translate.google.com/translate_a/element.js?cb=loadGoogleTranslate"></script>
+  </body>
+</html>
