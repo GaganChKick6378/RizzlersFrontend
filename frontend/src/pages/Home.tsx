@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import { useParams } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 
 import { DatePickerWithRange } from "@/components/ui/DatePickerWithRange";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,19 +20,24 @@ import { PiWheelchairBold } from "react-icons/pi";
 
 import { setSelectedPropertyId } from "../redux/slices/roomRatesSlice";
 import { fetchLandingConfig } from "../redux/slices/landingConfigSlice";
-
+import { format } from "date-fns";
 
 const Home: React.FC = () => {
   const { tenantId = "1" } = useParams<{ tenantId: string }>();
   const { config, loading, error } = useSelector(
     (state: RootState) => state.landingConfig
   );
-  const { selectedPropertyId } = useSelector(
+  const { selectedPropertyId, selectedDateRange } = useSelector(
     (state: RootState) => state.roomRates
   );
-  // selectedCurrency will be used for price conversion in the UI
   
+  const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
+  
+  // State for tracking filters
+  const [guestCounts, setGuestCounts] = useState<Record<string, number>>({});
+  const [roomCount, setRoomCount] = useState<number>(1);
+  const [needsAccessible, setNeedsAccessible] = useState<boolean>(false);
 
   // Fetch config when tenant ID changes
   useEffect(() => {
@@ -41,6 +46,22 @@ const Home: React.FC = () => {
       dispatch(fetchLandingConfig(numericTenantId));
     }
   }, [tenantId, dispatch]);
+
+  // Initialize guest counts when config is loaded
+  useEffect(() => {
+    if (config?.guest_types && config.guest_types.length > 0) {
+      // Only initialize if the guest counts object is empty
+      if (Object.keys(guestCounts).length === 0) {
+        const initialCounts = config.guest_types.reduce((acc, type) => {
+          acc[type.guestType] = 0;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        console.log('Initializing guest counts:', initialCounts);
+        setGuestCounts(initialCounts);
+      }
+    }
+  }, [config?.guest_types, guestCounts]);
 
   // Detect user's currency after config is loaded
   useEffect(() => {
@@ -58,6 +79,56 @@ const Home: React.FC = () => {
   const handlePropertyChange = (value: string) => {
     const selectedId = Number(value);
     dispatch(setSelectedPropertyId(selectedId));
+  };
+
+  const handleGuestChange = (counts: Record<string, number>) => {
+    console.log('Guest counts changed:', counts);
+    setGuestCounts(counts);
+  };
+
+  const handleRoomChange = (value: string) => {
+    setRoomCount(parseInt(value, 10));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!selectedPropertyId) return;
+    
+    // Build query parameters
+    const queryParams = [];
+    
+    // Add date range if selected
+    if (selectedDateRange?.from) {
+      queryParams.push(`checkIn=${format(selectedDateRange.from, "yyyy-MM-dd")}`);
+    }
+    if (selectedDateRange?.to) {
+      queryParams.push(`checkOut=${format(selectedDateRange.to, "yyyy-MM-dd")}`);
+    }
+    
+    // Add guest information - maintain original case for guest types
+    if (Object.keys(guestCounts).length > 0) {
+      // Instead of joining all guest params as one string, add them individually
+      Object.entries(guestCounts)
+        .filter(([, count]) => count > 0)
+        .forEach(([type, count]) => {
+          queryParams.push(`${type}=${count}`);
+        });
+    }
+    
+    // Add room count
+    queryParams.push(`rooms=${roomCount}`);
+    
+    // Add accessibility if needed
+    if (needsAccessible) {
+      queryParams.push('accessible=true');
+    }
+    
+    // Build the URL
+    const queryString = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';
+    console.log('Navigating to:', `/${tenantId}/${selectedPropertyId}/rooms${queryString}`);
+    console.log('Guest counts in URL:', guestCounts);
+    navigate(`/${tenantId}/${selectedPropertyId}/rooms${queryString}`);
   };
 
   if (loading) {
@@ -88,7 +159,7 @@ const Home: React.FC = () => {
       className="absolute bg-cover bg-center bg-no-repeat w-screen h-[42.4375rem] top-[84px] left-1/2 -translate-x-1/2"
       style={bannerStyle}
     >
-      <form className="absolute bg-white pl-[2.75rem] pr-[2.75rem] pt-[3.375rem] rounded-[0.3125rem] w-[23.75rem] h-[36.5625rem] top-[3.5rem] md:left-[78px] left-1/2 md:w-[23.75rem]">
+      <form onSubmit={handleSubmit} className="absolute bg-white pl-[2.75rem] pr-[2.75rem] pt-[3.375rem] rounded-[0.3125rem] w-[23.75rem] h-[36.5625rem] top-[3.5rem] md:left-[78px] left-1/2 md:w-[23.75rem]">
         {/* Property Selection - only render if properties exist */}
         {config?.properties && config.properties.length > 0 && (
           <div className="mb-4">
@@ -181,9 +252,7 @@ const Home: React.FC = () => {
                     Guests
                   </label>
                   <GuestSelector
-                    onChange={(counts) => {
-                      console.log("Guest counts:", counts);
-                    }}
+                    onChange={handleGuestChange}
                   />
                 </div>
               )}
@@ -199,7 +268,7 @@ const Home: React.FC = () => {
                   <label className="block text-sm font-400 text-[#2F2F2F] mb-1">
                     Rooms
                   </label>
-                  <Select defaultValue="1">
+                  <Select defaultValue="1" onValueChange={handleRoomChange}>
                     <SelectTrigger
                       className="w-full px-[1.1875rem] py-[0.75rem] !h-[3rem] text-[#858685] rounded-[0.25rem] border border-gray-300"
                       style={{ height: "3rem" }}
@@ -250,6 +319,8 @@ const Home: React.FC = () => {
                 type="checkbox"
                 id="accessible-room"
                 className="h-4 w-4 text-[#130739] border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                checked={needsAccessible}
+                onChange={(e) => setNeedsAccessible(e.target.checked)}
               />
               <label
                 htmlFor="accessible-room"

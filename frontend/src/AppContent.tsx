@@ -20,6 +20,7 @@ import frMessages from "./locales/fr.json";
 import deMessages from "./locales/de.json";
 import itMessages from "./locales/it.json";
 import WrappedHeader from "./components/Header";
+import Room from "./pages/rooms/Room";
 
 interface MessageFormat {
   language: string;
@@ -74,7 +75,7 @@ export const AppContent = () => {
               {/* Routes with tenant ID parameter */}
               <Route path="/:tenantId" element={<Home />} />
               <Route path="/:tenantId/my-bookings" element={<MyBookings />} />
-
+              <Route path="/:tenantId/:propertyId/rooms" element={<Room />} />
               {/* Legacy route for compatibility */}
               <Route
                 path="/my-bookings"

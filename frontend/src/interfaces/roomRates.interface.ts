@@ -1,5 +1,3 @@
-import { DateRange } from "react-day-picker";
-
 export interface DailyRate {
   date: string;
   minimum_rate: number;
@@ -8,10 +6,16 @@ export interface DailyRate {
   discounted_rate: number;
 }
 
+// Serializable version of DateRange for Redux
+export interface SerializableDateRange {
+  from: string | null;
+  to: string | null;
+}
+
 export interface RoomRatesState {
   rates: DailyRate[];
   loading: boolean;
   error: string | null;
-  selectedDateRange: DateRange | null;
+  selectedDateRange: SerializableDateRange | null;
   selectedPropertyId: number | null;
 }

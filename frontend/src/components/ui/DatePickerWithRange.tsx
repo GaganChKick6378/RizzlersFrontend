@@ -9,7 +9,7 @@ import {
   subMonths,
   isSameMonth,
 } from "date-fns";
-
+import { useLocation } from "react-router-dom";
 import { CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
@@ -20,7 +20,12 @@ import { Calendar } from "./calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { useSelector, useDispatch } from "react-redux";
 import { RootState, AppDispatch } from "../../redux/store";
-import { fetchDailyRates, setSelectedDateRange } from "../../redux/slices/roomRatesSlice";
+import { 
+  fetchDailyRates, 
+  setSelectedDateRange, 
+  setSelectedPropertyId, 
+  deserializeDateRange 
+} from "../../redux/slices/roomRatesSlice";
 import { DailyRate } from "../../interfaces/roomRates.interface";
 
 // Custom hook for responsive design
@@ -46,6 +51,8 @@ function useMediaQuery(query: string) {
 export function DatePickerWithRange({
   className,
 }: React.HTMLAttributes<HTMLDivElement>) {
+  const location = useLocation();
+  const isRoomsPage = /\/\d+\/\d+\/rooms/.test(location.pathname);
   const dispatch = useDispatch<AppDispatch>();
   const today = startOfToday();
   const [open, setOpen] = React.useState(false);
@@ -55,7 +62,10 @@ export function DatePickerWithRange({
   
   // Get data from Redux store
   const { config } = useSelector((state: RootState) => state.landingConfig);
-  const { rates, selectedDateRange, selectedPropertyId, loading } = useSelector((state: RootState) => state.roomRates);
+  const { rates, selectedDateRange: serializedDateRange, selectedPropertyId, loading } = useSelector((state: RootState) => state.roomRates);
+  
+  // Convert serialized date range back to DateRange object
+  const selectedDateRange = deserializeDateRange(serializedDateRange);
   
   // Get the currency from header state
   const { currency } = useSelector((state: RootState) => state.header);
@@ -74,6 +84,18 @@ export function DatePickerWithRange({
     }
   }, [selectedPropertyId, dispatch]);
 
+  // Auto-select property ID for rooms page if not already set
+  React.useEffect(() => {
+    if (isRoomsPage && !selectedPropertyId) {
+      // Extract propertyId from URL if available
+      const match = location.pathname.match(/\/(\d+)\/(\d+)\/rooms/);
+      if (match && match[2]) {
+        const urlPropertyId = parseInt(match[2], 10);
+        dispatch(setSelectedPropertyId(urlPropertyId));
+      }
+    }
+  }, [isRoomsPage, selectedPropertyId, location.pathname, dispatch]);
+
   React.useEffect(() => {
     if (selectedDateRange?.from && !isSameMonth(selectedDateRange.from, currentMonth) && !isSameMonth(selectedDateRange.from, rightMonth)) {
       setCurrentMonth(selectedDateRange.from);
@@ -86,6 +108,35 @@ export function DatePickerWithRange({
     style.innerHTML = `
       .rdp-day_selected, .rdp-day_range_start, .rdp-day_range_end {
         padding: 0.25rem !important;
+      }
+      
+      .rooms-calendar-price {
+        font-size: 11px;
+        font-weight: 500;
+        margin-top: 2px;
+        color: #5D5D5D;
+      }
+      
+      .rooms-calendar-day {
+        font-size: 16px;
+        font-weight: 500;
+        color: #2F2F2F;
+      }
+      
+      .calendar-day-cell {
+        border: 1px solid #F0F0F0;
+        border-radius: 4px;
+        background: white;
+      }
+      
+      .calendar-selected-day {
+        background-color: #26266D !important;
+        color: white !important;
+        border-radius: 4px;
+      }
+      
+      .calendar-selected-day .rooms-calendar-day {
+        color: white !important;
       }
     `;
     document.head.appendChild(style);
@@ -101,7 +152,14 @@ export function DatePickerWithRange({
       // Check for both min and max stay duration
       if (diff > maxStayDuration || diff < minStayDuration) return;
     }
+    
+    // Pass the DateRange object for conversion to serializable format in the reducer
     dispatch(setSelectedDateRange(newRange || null));
+    
+    // If applied, close the popover
+    if (newRange?.from && newRange?.to) {
+      setTimeout(() => setOpen(false), 100);
+    }
   };
 
   const isDisabled = (day: Date): boolean => {
@@ -226,64 +284,110 @@ export function DatePickerWithRange({
   const totalPrice = calculateTotalPrice();
 
   return (
-    <div className={cn("relative", className)}>
-      <Popover open={open && !!selectedPropertyId} onOpenChange={(isOpen) => selectedPropertyId && setOpen(isOpen)}>
+    <div className={cn("relative w-full", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button
-            id="date"
-            variant={"outline"}
-            className={cn(
-              "w-full px-4 py-3 h-12 text-left font-normal border border-gray-300 rounded",
-              !selectedDateRange && "text-muted-foreground",
-              !selectedPropertyId && "opacity-70 cursor-not-allowed"
-            )}
-            disabled={!selectedPropertyId}
-            onClick={() => {
-              if (!selectedPropertyId) {
-                // Prevent opening if no property selected
-                return;
-              }
-            }}
-          >
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-5 text-sm text-black">
-                {!selectedPropertyId ? (
-                  <span className="text-gray-500">Please select an property</span>
-                ) : (
-                  <>
-                    <span>{selectedDateRange?.from ? format(selectedDateRange.from, "MMM d, yyyy") : "Check-in"}</span>
-                    <span className="mx-1">→</span>
-                    <span>{selectedDateRange?.to ? format(selectedDateRange.to, "MMM d, yyyy") : "Check-out"}</span>
-                    
-                  </>
-                )}
+          {isRoomsPage ? (
+            <div 
+              className="flex w-full h-full border border-gray-300 rounded overflow-hidden cursor-pointer"
+              onClick={() => setOpen(true)}
+              style={{ height: '68px' }}
+            >
+              <div className="flex-1 border-r border-gray-300">
+                <Button
+                  id="date-from"
+                  variant={"outline"}
+                  className="w-full h-full px-4 py-3 text-left font-normal border-0 rounded-none flex items-center"
+                  style={{ height: '68px' }}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="text-sm font-medium text-[#2F2F2F]">Check in between</span>
+                    <span className="text-sm text-[#858685]">
+                      {selectedDateRange?.from ? format(selectedDateRange.from, "MMM d, yyyy") : "Any Date"}
+                    </span>
+                  </div>
+                </Button>
               </div>
-              <CalendarIcon className="h-5 w-5 text-black" />
+              <div className="flex-1">
+                <Button
+                  id="date-to"
+                  variant={"outline"}
+                  className="w-full h-full px-4 py-3 text-left font-normal border-0 rounded-none flex items-center"
+                  style={{ height: '68px' }}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="text-sm font-medium text-[#2F2F2F]">Check out between</span>
+                    <span className="text-sm text-[#858685]">
+                      {selectedDateRange?.to ? format(selectedDateRange.to, "MMM d, yyyy") : "Any Date"}
+                    </span>
+                  </div>
+                </Button>
+              </div>
+              <div className="flex items-center justify-center px-4 bg-white h-full">
+                <CalendarIcon className="h-6 w-6 text-black" />
+              </div>
             </div>
-          </Button>
+          ) : (
+            <Button
+              id="date"
+              variant={"outline"}
+              className={cn(
+                "w-full px-4 py-3 h-12 text-left font-normal border border-gray-300 rounded",
+                !selectedDateRange && "text-muted-foreground",
+                !selectedPropertyId && "opacity-70 cursor-not-allowed"
+              )}
+              disabled={!selectedPropertyId}
+              onClick={() => {
+                if (!selectedPropertyId) {
+                  // Prevent opening if no property selected
+                  return;
+                }
+              }}
+            >
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-5 text-sm text-black">
+                  {!selectedPropertyId ? (
+                    <span className="text-gray-500">Please select an property</span>
+                  ) : (
+                    <>
+                      <span>{selectedDateRange?.from ? format(selectedDateRange.from, "MMM d, yyyy") : "Check-in"}</span>
+                      <span className="mx-1">→</span>
+                      <span>{selectedDateRange?.to ? format(selectedDateRange.to, "MMM d, yyyy") : "Check-out"}</span>
+                      
+                    </>
+                  )}
+                </div>
+                <CalendarIcon className="h-5 w-5 text-black" />
+              </div>
+            </Button>
+          )}
         </PopoverTrigger>
 
         <PopoverContent
           className={cn(
-            "absolute left-0 top-full mt-2 bg-white shadow-md z-50", 
-            isMobile ? "w-[20rem]" : "w-[56rem]"
+            "mt-2 bg-white shadow-md z-50", 
+            isRoomsPage ? "w-full" : isMobile ? "w-[20rem]" : "w-[56rem]"
           )}
-          align="start"
+          align={isRoomsPage ? "center" : "start"}
           side="bottom"
           sideOffset={5}
         >
-          <div className={cn("h-auto", isMobile ? "max-h-[31.375rem]" : "h-[31.375rem]")}>
-            {isMobile ? (
-              // Mobile view - One month
-              <div className="w-full p-2">
-                <div className="flex items-center mb-4 justify-between">
+          <div className={cn(
+            "h-auto", 
+            isRoomsPage || isMobile ? "max-h-[400px]" : "h-[31.375rem]",
+            isRoomsPage && "px-2 pt-1 pb-0"
+          )}>
+            {isRoomsPage || isMobile ? (
+              // Single month view - for rooms page or mobile
+              <div className="w-full mb-4">
+                <div className="flex items-center justify-between">
                   <button
                     onClick={prevMonth}
                     className="h-6 w-6 flex items-center justify-center"
                   >
                     <ChevronLeft className="w-[1.5rem] h-[1.5rem] text-[#C1C2C2]" />
                   </button>
-                  <span className="text-lg font-400 text-[#5D5D5D]">
+                  <span className="text-lg font-medium text-[#5D5D5D]">
                     {format(currentMonth, "MMMM yyyy")}
                   </span>
                   <button
@@ -295,7 +399,7 @@ export function DatePickerWithRange({
                 </div>
               </div>
             ) : (
-              // Desktop view - Two months
+              // Desktop view - Two months (only for non-rooms pages)
               <div className="flex space-x-8">
                 <div className="w-full pl-2">
                   <div className="flex items-center mb-4 justify-start">
@@ -336,64 +440,114 @@ export function DatePickerWithRange({
               </div>
             )}
 
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={currentMonth}
-              month={currentMonth}
-              selected={selectedDateRange || undefined}
-              onSelect={handleSelect}
-              numberOfMonths={isMobile ? 1 : 2}
-              disabled={isDisabled}
-              weekStartsOn={0}
-              modifiers={{
-                today: []  // Empty array to disable today highlighting
-              }}
-              modifiersStyles={{
-                day_range_start: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem" },
-                day_range_end: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem" },
-                day_range_middle: { backgroundColor: "#C1C2C2", color: "black" },
-                selected: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem" }
-              }}
-              classNames={{
-                months: isMobile ? "" : "flex space-x-9",
-                month: "w-full relative",
-                caption: "hidden",
-                nav: "hidden",
-                table: "w-full border-collapse",
-                head_row: "flex justify-between text-gray-600 text-sm font-medium mb-2",
-                head_cell: "w-10 text-center",
-                row: "flex justify-between gap-2", 
-                cell: isMobile ? "mb-7 flex flex-col items-center justify-center" : "w-[50px] mb-7 flex flex-col items-center justify-center",
-                day: isMobile ? "flex flex-col items-center justify-center" : "w-[50px] flex flex-col items-center justify-center", 
-                day_today: "",  // Empty string to remove today styling
-                day_selected: "!bg-[#26266D] !text-white !font-bold !p-1 !min-h-15",
-                day_range_start: "!bg-[#26266D] !text-white !font-bold !p-1",
-                day_range_end: "!bg-[#26266D] !text-white !font-bold !p-1",
-                day_range_middle: "!bg-[#C1C2C2] !text-black",
-                day_disabled: "!text-gray-400 !cursor-not-allowed",
-              }}
-              formatters={{
-                formatDay: (date) => {
-                  const rateInfo = getPriceForDate(date);
-                  const dayHeight = rateInfo?.has_promotion ? "h-[58px]" : "h-[40px]";
-                  
-                  return (
-                    <div className={`flex flex-col items-center justify-center ${dayHeight}`}>
-                      {renderDayContents(date)}
-                    </div>
-                  );
-                },
-                formatWeekdayName: (day) => {
-                  const weekdayLabels = ["SU", "M", "T", "W", "TH", "F", "S"];
-                  return <span className="text-[#858685]">{weekdayLabels[day.getDay()]}</span>;
-                }
-              }}
-            />
+            <div className={cn(
+              isRoomsPage ? "max-h-[260px] overflow-y-auto px-1" : ""
+            )}>
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={currentMonth}
+                month={currentMonth}
+                selected={selectedDateRange || undefined}
+                onSelect={handleSelect}
+                numberOfMonths={isRoomsPage || isMobile ? 1 : 2}
+                disabled={isDisabled}
+                weekStartsOn={0}
+                modifiers={{
+                  today: []  // Empty array to disable today highlighting
+                }}
+                modifiersStyles={{
+                  day_range_start: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem", borderRadius: "8px" },
+                  day_range_end: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem", borderRadius: "8px" },
+                  day_range_middle: { backgroundColor: "#C1C2C2", color: "black" },
+                  selected: { backgroundColor: "#26266D", color: "white", fontWeight: "bold", padding: "0.25rem", borderRadius: "8px" }
+                }}
+                classNames={{
+                  months: isRoomsPage || isMobile ? "" : "flex space-x-9",
+                  month: "w-full relative",
+                  caption: "hidden",
+                  nav: "hidden",
+                  table: "w-full border-collapse",
+                  head_row: cn("flex justify-between text-gray-600 text-sm font-medium mb-2", isRoomsPage && "px-1"),
+                  head_cell: isRoomsPage ? "w-[14%] text-center" : "w-10 text-center",
+                  row: cn("flex justify-between", isRoomsPage ? "mb-2 gap-1" : "gap-2"), 
+                  cell: isRoomsPage 
+                    ? "flex flex-col items-center justify-center w-[14%] p-1 calendar-day-cell" 
+                    : (isMobile ? "mb-7 flex flex-col items-center justify-center" : "w-[50px] mb-7 flex flex-col items-center justify-center"),
+                  day: isRoomsPage 
+                    ? "flex flex-col items-center justify-center w-full p-1" 
+                    : (isMobile ? "flex flex-col items-center justify-center" : "w-[50px] flex flex-col items-center justify-center"), 
+                  day_today: "",  // Empty string to remove today styling
+                  day_selected: isRoomsPage ? "calendar-selected-day" : "!bg-[#26266D] !text-white !font-bold !p-1 !min-h-15",
+                  day_range_start: isRoomsPage ? "calendar-selected-day" : "!bg-[#26266D] !text-white !font-bold !p-1",
+                  day_range_end: isRoomsPage ? "calendar-selected-day" : "!bg-[#26266D] !text-white !font-bold !p-1",
+                  day_range_middle: "!bg-[#C1C2C2] !text-black",
+                  day_disabled: "!text-gray-400 !cursor-not-allowed opacity-40",
+                }}
+                formatters={{
+                  formatDay: (date) => {
+                    const rateInfo = getPriceForDate(date);
+                    const dayHeight = isRoomsPage 
+                      ? (rateInfo?.has_promotion ? "h-[80px]" : "h-[60px]")
+                      : (rateInfo?.has_promotion ? "h-[58px]" : "h-[40px]");
+                    
+                    if (isRoomsPage) {
+                      return (
+                        <div className={`flex flex-col items-center justify-center ${dayHeight}`}>
+                          <span className="rooms-calendar-day">{format(date, "d")}</span>
+                          {loading ? (
+                            <div className="text-xs mt-1 text-gray-400">...</div>
+                          ) : rateInfo !== null ? (
+                            <div className="rooms-calendar-price text-center">
+                              {rateInfo.has_promotion ? (
+                                <>
+                                  <div className="line-through text-xs text-gray-400">
+                                    <FormattedPrice 
+                                      amount={Math.round(rateInfo.minimum_rate * (currency.multiplier ?? 1) * 100) / 100}
+                                      currencyCode={currency.code}
+                                      currencySymbol={currency.symbol}
+                                    />
+                                  </div>
+                                  <div>
+                                    <FormattedPrice 
+                                      amount={Math.round(rateInfo.discounted_rate * (currency.multiplier ?? 1) * 100) / 100}
+                                      currencyCode={currency.code}
+                                      currencySymbol={currency.symbol}
+                                    />
+                                  </div>
+                                </>
+                              ) : (
+                                <div>
+                                  <FormattedPrice 
+                                    amount={Math.round(rateInfo.minimum_rate * (currency.multiplier ?? 1) * 100) / 100}
+                                    currencyCode={currency.code}
+                                    currencySymbol={currency.symbol}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <div className={`flex flex-col items-center justify-center ${dayHeight}`}>
+                          {renderDayContents(date)}
+                        </div>
+                      );
+                    }
+                  },
+                  formatWeekdayName: (day) => {
+                    const weekdayLabels = ["SU", "M", "T", "W", "TH", "F", "S"];
+                    return <span className="text-[#858685]">{weekdayLabels[day.getDay()]}</span>;
+                  }
+                }}
+              />
+            </div>
           </div>
           
           <div className="p-4 border-t border-gray-200 flex flex-col">
-            <div className={cn("flex justify-between items-center w-full mb-2", isMobile && "flex-col gap-3")}>
+            <div className={cn("flex justify-between items-center w-full mb-2", (isRoomsPage || isMobile) && "flex-col gap-3")}>
               <div className="flex flex-col">
                 {selectedDateRange?.from && selectedDateRange?.to && (
                   loading ? (

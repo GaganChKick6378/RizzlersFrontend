@@ -1,0 +1,48 @@
+/* Custom Swiper Navigation Styles */
+
+/* Global root variables */
+:root {
+  --swiper-navigation-size: 24px;
+  --swiper-navigation-color: #ffffff;
+}
+
+/* Direct styling for navigation buttons */
+.swiper-button-prev,
+.swiper-button-next {
+  width: 10px;
+  height: 24px;
+  color: #ffffff !important;
+  background-color: rgba(0, 0, 0, 0.4);
+  border-radius: 2px;
+  padding: 12px;
+}
+
+.swiper-button-prev:after,
+.swiper-button-next:after {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Hover effect */
+.swiper-button-prev:hover,
+.swiper-button-next:hover {
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+/* More specificity to ensure styles are applied */
+.swiper-container .swiper-button-prev,
+.swiper-container .swiper-button-next,
+.swiper .swiper-button-prev,
+.swiper .swiper-button-next {
+  width: 10px !important;
+  height: 24px !important;
+  color: #ffffff !important;
+}
+
+/* Additional override for any nested components */
+body .swiper-button-prev,
+body .swiper-button-next {
+  width: 10px !important;
+  height: 24px !important;
+  color: #ffffff !important;
+} 

@@ -1,6 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { DailyRate, RoomRatesState } from '@/interfaces/roomRates.interface';
+import { DateRange } from "react-day-picker";
+
+// Define a serializable version of DateRange
+interface SerializableDateRange {
+  from: string | null;
+  to: string | null;
+}
+
+// Helper function to convert Date objects to ISO strings
+const serializeDateRange = (dateRange: DateRange | null): SerializableDateRange | null => {
+  if (!dateRange) return null;
+  return {
+    from: dateRange.from ? dateRange.from.toISOString() : null,
+    to: dateRange.to ? dateRange.to.toISOString() : null
+  };
+};
+
+// Helper function to convert ISO strings back to Date objects
+export const deserializeDateRange = (dateRange: SerializableDateRange | null): DateRange | null => {
+  if (!dateRange) return null;
+  return {
+    from: dateRange.from ? new Date(dateRange.from) : undefined,
+    to: dateRange.to ? new Date(dateRange.to) : undefined
+  };
+};
 
 const initialState: RoomRatesState = {
   rates: [],
@@ -32,7 +57,8 @@ const roomRatesSlice = createSlice({
   initialState,
   reducers: {
     setSelectedDateRange: (state, action) => {
-      state.selectedDateRange = action.payload;
+      // Convert Date objects to ISO strings when storing in Redux
+      state.selectedDateRange = serializeDateRange(action.payload);
     },
     clearSelectedDateRange: (state) => {
       state.selectedDateRange = null;

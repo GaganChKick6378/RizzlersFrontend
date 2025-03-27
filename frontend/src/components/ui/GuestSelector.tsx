@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
+import { useLocation } from 'react-router-dom';
 import { RootState } from '@/redux/store';
 import { 
   Select,
@@ -15,23 +16,46 @@ interface GuestCount {
 
 interface GuestSelectorProps {
   onChange: (counts: GuestCount) => void;
+  initialValues?: GuestCount;
 }
 
-export function GuestSelector({ onChange }: GuestSelectorProps) {
+export function GuestSelector({ onChange, initialValues }: GuestSelectorProps) {
   const config = useSelector((state: RootState) => state.landingConfig.config);
-  const [counts, setCounts] = useState<GuestCount>({});
+  const [counts, setCounts] = useState<GuestCount>(initialValues || {});
+  const location = useLocation();
   
+  // Check if we're on a rooms page
+  const isRoomsPage = /\/\d+\/\d+\/rooms/.test(location.pathname);
+  
+  // Log initial values for debugging
+  useEffect(() => {
+    console.log('GuestSelector initialValues:', initialValues);
+    if (initialValues && Object.keys(initialValues).length > 0) {
+      console.log('Setting counts from initialValues:', initialValues);
+      setCounts(initialValues);
+    }
+  }, [initialValues]);
+
   // Initialize guest counts when config is loaded
   useEffect(() => {
     if (config?.guest_types) {
-      setCounts(
-        config.guest_types.reduce((acc, type) => ({
-          ...acc,
-          [type.guestType]: 0
-        }), {})
-      );
+      const initialCounts = { ...counts };
+      let needsUpdate = false;
+      
+      // Initialize any missing types with 0
+      config.guest_types.forEach(type => {
+        if (initialCounts[type.guestType] === undefined) {
+          initialCounts[type.guestType] = 0;
+          needsUpdate = true;
+        }
+      });
+      
+      if (needsUpdate) {
+        console.log('Updating guest counts with missing types:', initialCounts);
+        setCounts(initialCounts);
+      }
     }
-  }, [config?.guest_types]);
+  }, [config?.guest_types, counts]);
 
   const handleChange = (type: string, increment: boolean) => {
     if (!config?.guest_types) return;
@@ -45,29 +69,64 @@ export function GuestSelector({ onChange }: GuestSelectorProps) {
     } else if (!increment && newCounts[type] > 0) {
       newCounts[type]--;
     }
+    
+    console.log('Updated guest counts:', newCounts);
     setCounts(newCounts);
     onChange(newCounts);
   };
 
   const totalGuests = Object.values(counts).reduce((sum, count) => sum + count, 0);
 
+  // Format guest counts for rooms page
+  const formatDetailedGuestCounts = () => {
+    if (totalGuests === 0) return "Guests";
+    
+    const guestParts = Object.entries(counts)
+      .filter(([, count]) => count > 0)
+      .map(([type, count]) => {
+        // Keep original capitalization for display
+        return `${count} ${type}${count !== 1 ? 's' : ''}`;
+      });
+    
+    console.log('Formatted guest counts:', guestParts);
+    return guestParts.join(', ');
+  };
+
   // If config or guest_types aren't available, don't render
   if (!config?.guest_types || !config.guest_options?.show) return null;
+
+  // Set different height styles based on the page
+  const triggerClassName = isRoomsPage 
+    ? "w-full h-full px-[1.1875rem] py-[0.75rem] text-[#858685] rounded-[0.25rem] border border-gray-300 flex items-center"
+    : "w-full px-[1.1875rem] py-[0.75rem] !h-[3rem] text-[#858685] rounded-[0.25rem] border border-gray-300";
+  
+  const triggerStyle = isRoomsPage 
+    ? { height: '68px' } 
+    : { height: '3rem' };
 
   return (
     <Select>
       <SelectTrigger 
-        className="w-full px-[1.1875rem] py-[0.75rem] !h-[3rem] text-[#858685] rounded-[0.25rem] border border-gray-300"
-        style={{ height: '3rem' }}
+        className={triggerClassName}
+        style={triggerStyle}
       >
-        <SelectValue 
-          placeholder={totalGuests > 0 ? `${totalGuests} Guest${totalGuests !== 1 ? 's' : ''}` : "Guests"} 
-          style={{ 
-            fontStyle: 'italic',
-            color: '#2F2F2F', 
-            fontWeight: 'normal'
-          }}
-        />
+        {isRoomsPage ? (
+          <div className="flex flex-col items-start w-full">
+            <span className="text-sm font-medium text-[#2F2F2F]">Guests</span>
+            <span className="text-sm text-[#858685]">
+              {formatDetailedGuestCounts()}
+            </span>
+          </div>
+        ) : (
+          <SelectValue 
+            placeholder={totalGuests > 0 ? `${totalGuests} Guest${totalGuests !== 1 ? 's' : ''}` : "Guests"} 
+            style={{ 
+              fontStyle: 'italic',
+              color: '#2F2F2F', 
+              fontWeight: 'normal'
+            }}
+          />
+        )}
       </SelectTrigger>
       <SelectContent>
         {config.guest_types.map((guestType) => (

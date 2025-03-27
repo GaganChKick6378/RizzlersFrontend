@@ -7,6 +7,7 @@ import headerReducer from './slices/headerSlice';
 import landingConfigReducer from './slices/landingConfigSlice';
 import roomRatesReducer from './slices/roomRatesSlice';
 import locationReducer from './slices/locationSlice';
+import roomReducer from './slices/roomSlice';
 
 // Setup Redux persist configuration
 const persistConfig = {
@@ -21,6 +22,7 @@ const rootReducer = combineReducers({
   landingConfig: landingConfigReducer,
   roomRates: roomRatesReducer,
   location: locationReducer,
+  room: roomReducer,
 });
 
 // Create the persisted reducer
